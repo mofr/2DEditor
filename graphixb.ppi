@@ -1,0 +1,11976 @@
+{
+    This file is a part of the graphics library GraphiX
+    Copyright (C) 2001 Michael Knapp
+
+    This library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+    License as published by the Free Software Foundation; either
+    version 2.1 of the License, or (at your option) any later version.
+
+    This library is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    Lesser General Public License for more details.
+
+    You should have received a copy of the GNU Lesser General Public
+    License along with this library; if not, write to the Free Software
+    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+}
+
+{================================ copy procs ================================}
+
+PROCEDURE copy_sram2sramB(src,dst,size:dword);assembler;
+ASM
+  MOV ECX,size
+  SHR ECX,2
+  MOV ESI,src
+  MOV EDI,dst
+  CLD
+  REP MOVSD
+END;
+
+PROCEDURE copy_sram2vramB(src,dst,size:dword);assembler;
+ASM
+  MOV EBX,size
+  SHR EBX,2
+  MOV ECX,EBX
+  MOV ESI,src
+  MOV EDI,dst
+  CLD
+
+  MOV EAX,EDI
+  NOT EAX
+  AND EAX,0000FFFFh
+  INC EAX
+  SHR EAX,2
+  CMP EAX,EBX
+  JG @w1
+  MOV ECX,EAX
+@w1:
+  PUSH EBX
+  PUSH ECX
+  MOV EDX,EDI
+  SHR EDX,16
+  MOV curbank,DX
+  CALL bankswitch
+  POP ECX
+  POP EBX
+
+  AND EDI,0000FFFFh
+  ADD EDI,vgabase
+  SUB EBX,ECX
+  REP MOVSD
+  OR EBX,EBX
+  JZ @ende
+
+@loop:
+  MOV ECX,4000h
+  CMP EBX,ECX
+  JA @w2
+  MOV ECX,EBX
+@w2:
+  PUSH EBX
+  PUSH ECX
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POP ECX
+  POP EBX
+
+  MOV EDI,vgabase
+  SUB EBX,ECX
+  REP MOVSD
+  OR EBX,EBX
+  JNZ @loop
+@ende:
+END;
+
+PROCEDURE copy_vram2sramB(src,dst,size:dword);assembler;
+ASM
+  MOV ECX,size
+  SHR ECX,2
+  MOV ESI,src
+  MOV EDI,dst
+  CLD
+
+  MOV EAX,ESI
+  NOT EAX
+  AND EAX,0000FFFFh
+  INC EAX
+  SHR EAX,2
+  CMP EAX,EBX
+  JG @w1
+  MOV ECX,EAX
+@w1:
+  PUSH EBX
+  PUSH ECX
+  MOV EDX,ESI
+  SHR EDX,16
+  MOV curbank,DX
+  CALL bankswitch
+  POP ECX
+  POP EBX
+
+  AND ESI,0000FFFFh
+  ADD ESI,vgabase
+  SUB EBX,ECX
+  REP MOVSD
+  OR EBX,EBX
+  JZ @ende
+@loop:
+  MOV ECX,4000h
+  CMP EBX,16384h
+  JA @w2
+  MOV ECX,EBX
+@w2:
+  PUSH EBX
+  PUSH ECX
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POP ECX
+  POP EBX
+
+  MOV ESI,vgabase
+  SUB EBX,ECX
+  REP STOSD
+  OR EBX,EBX
+  JNZ @loop
+@ende:
+
+END;
+
+PROCEDURE copy_vram2vramB(src,dst,size:dword);assembler;
+ASM
+  MOV ECX,size
+  SHR ECX,2
+  MOV ESI,src
+  MOV EDI,dst
+  CLD
+END;
+
+{================================ DispMFB ===================================}
+{
+PROCEDURE copy_ram2vramB(src,dst:pointer);assembler;
+ASM
+  MOV DX,WORD PTR [dst+2]
+  CALL bankswitch
+  MOV DX,WORD PTR [dst+2]
+  INC DX
+
+  MOV ESI,src
+  MOVZX EDI,WORD PTR [dst]
+
+  MOVZX ECX,DI
+  NOT CX
+  INC ECX
+
+  MOV EBX,scrnsize
+  SUB EBX,ECX
+  JGE @cpy_r2vr_weiter
+  MOV EBX,0
+  MOV ECX,scrnsize
+@cpy_r2vr_weiter:
+  PUSH EBX
+
+  SHR ECX,2
+  SHR EBX,16
+  INC EBX
+
+  ADD EDI,VGAbase
+@cpy_r2vr_loop:
+  REP MOVSD
+  PUSH EBX
+  PUSH EDX
+  CALL bankswitch
+  POP EDX
+  POP EBX
+  MOV EDI,VGAbase
+  MOV ECX,16384
+  INC EDX
+  DEC EBX
+  JNZ @cpy_r2vr_loop
+
+  POP ECX
+  MOVZX ECX,CX
+
+  SHR ECX,2
+  REP MOVSD
+
+  MOV curbank,DX
+END;
+
+PROCEDURE copy_vram2ramB(src,dst:pointer);assembler;
+ASM
+  MOV DX,WORD PTR [src+2]
+  CALL bankswitch
+  MOV DX,WORD PTR [src+2]
+  INC DX
+
+  MOVZX ESI,WORD PTR [src]
+  MOV EDI,dst
+
+  MOVZX ECX,SI
+  NOT CX
+  INC ECX
+
+  MOV EBX,scrnsize
+  SUB EBX,ECX
+  JGE @cpy_vr2r_weiter
+  MOV EBX,0
+  MOV ECX,scrnsize
+@cpy_vr2r_weiter:
+  PUSH EBX
+
+  SHR ECX,2
+  SHR EBX,16
+  INC EBX
+  ADD ESI,VGAbase
+@cpy_vr2r_loop:
+  REP MOVSD
+  PUSH EBX
+  PUSH EDX
+  CALL bankswitch
+  POP EDX
+  POP EBX
+  MOV ESI,VGAbase
+  MOV ECX,16384
+  INC EDX
+  DEC EBX
+  JNZ @cpy_vr2r_loop
+  POP ECX
+  MOVZX ECX,CX
+  SHR ECX,2
+  REP MOVSD
+  MOV curbank,DX
+END;  }
+
+{============================= lineofs ====================================}
+
+FUNCTION lineofsB(y:longint):longint;assembler;
+ASM
+  MOV AX,WORD PTR bytperline
+  MUL WORD PTR y
+  ADD AX,WORD PTR [drawoffset]
+  ADC DX,WORD PTR [drawoffset+2]
+  CMP DX,curbank
+  JNE @lio_switch
+  JMP @ende
+@lio_switch:
+  PUSH EAX
+  MOV curbank,DX
+  CALL bankswitch
+  POP EAX
+@ende:
+  MOVZX EAX,AX
+  ADD EAX,VGAbase
+END;
+
+{============================= pixofs =====================================}
+
+FUNCTION pixofsB8(x,y:longint):longint;assembler;
+ASM
+  MOV AX,WORD PTR bytperline
+  MUL WORD PTR y
+  ADD AX,WORD PTR x
+  ADD AX,WORD PTR [drawoffset]
+  ADC DX,WORD PTR [drawoffset+2]
+  CMP DX,curbank
+  JNE @pio8_switch
+  JMP @pio8_ende
+@pio8_switch:
+  PUSH EAX
+  MOV curbank,DX
+  CALL bankswitch
+  POP EAX
+@pio8_ende:
+  MOVZX EAX,AX
+END;
+
+FUNCTION pixofsB16(x,y:longint):longint;assembler;
+ASM
+  MOV AX,WORD PTR bytperline
+  MUL WORD PTR y
+  MOV BX,WORD PTR x
+  SHL BX,1
+  ADD AX,BX
+  ADD AX,WORD PTR [drawoffset]
+  ADC DX,WORD PTR [drawoffset+2]
+  CMP DX,curbank
+  JNE @pio16_switch
+  JMP @pio16_ende
+@pio16_switch:
+  PUSH EAX
+  MOV curbank,DX
+  CALL bankswitch
+  POP EAX
+@pio16_ende:
+  MOVZX EAX,AX
+END;
+
+FUNCTION pixofsB24(x,y:longint):longint;assembler;
+ASM
+  MOV AX,WORD PTR bytperline
+  MUL WORD PTR y
+  MOV BX,WORD PTR x
+  ADD AX,BX
+  SHL BX,1
+  ADD AX,BX
+  ADD AX,WORD PTR [drawoffset]
+  ADC DX,WORD PTR [drawoffset+2]
+  CMP DX,curbank
+  JNE @pio24_switch
+  JMP @pio24_ende
+@pio24_switch:
+  PUSH EAX
+  MOV curbank,DX
+  CALL bankswitch
+  POP EAX
+@pio24_ende:
+  MOVZX EAX,AX
+END;
+
+FUNCTION pixofsB32(x,y:longint):longint;assembler;
+ASM
+  MOV AX,WORD PTR bytperline
+  MUL WORD PTR y
+  MOV BX,WORD PTR x
+  SHL BX,2
+  ADD AX,BX
+  ADD AX,WORD PTR [drawoffset]
+  ADC DX,WORD PTR [drawoffset+2]
+  CMP DX,curbank
+  JNE @pio32_switch
+  JMP @pio32_ende
+@pio32_switch:
+  PUSH EAX
+  MOV curbank,DX
+  CALL bankswitch
+  POP EAX
+@pio32_ende:
+  MOVZX EAX,AX
+END;
+
+{============================= putpixel ===================================}
+
+PROCEDURE putpixelB8(x,y,f:longint);assembler;
+ASM
+  MOV EAX,x
+  MOV EBX,y
+  CMP EAX,vx1
+  JL @pup8_ende
+  CMP EBX,vy1
+  JL @pup8_ende
+  CMP EAX,vx2
+  JG @pup8_ende
+  CMP EBX,vy2
+  JG @pup8_ende
+
+  MOV EDI,EAX
+  PUSH EBX
+  CALL lineofsB
+  ADD EDI,EAX
+  MOV EAX,f
+  MOV [EDI],AL
+@pup8_ende:
+END;
+
+PROCEDURE putpixelB16(x,y,f:longint);assembler;
+ASM
+  MOV EAX,x
+  MOV EBX,y
+  CMP EAX,vx1
+  JL @pup16_ende
+  CMP EBX,vy1
+  JL @pup16_ende
+  CMP EAX,vx2
+  JG @pup16_ende
+  CMP EBX,vy2
+  JG @pup16_ende
+
+  MOV EDI,EAX
+  SHL EDI,1
+  PUSH EBX
+  CALL lineofsB
+  ADD EDI,EAX
+  MOV EAX,f
+  MOV [EDI],AX
+@pup16_ende:
+END;
+
+PROCEDURE putpixelB24(x,y,f:longint);assembler;
+ASM
+  MOV EAX,x
+  MOV EBX,y
+  CMP EAX,vx1
+  JL @pup24_ende
+  CMP EBX,vy1
+  JL @pup24_ende
+  CMP EAX,vx2
+  JG @pup24_ende
+  CMP EBX,vy2
+  JG @pup24_ende
+
+  MOV EDI,EAX
+  SHL EDI,1
+  ADD EDI,EAX
+  PUSH EBX
+  CALL lineofsB
+  ADD EDI,EAX
+  MOV EAX,f
+  STOSW
+  SHR EAX,16
+  STOSB
+@pup24_ende:
+END;
+
+PROCEDURE putpixelB32(x,y,f:longint);assembler;
+ASM
+  MOV EAX,x
+  MOV EBX,y
+  CMP EAX,vx1
+  JL @pup32_ende
+  CMP EBX,vy1
+  JL @pup32_ende
+  CMP EAX,vx2
+  JG @pup32_ende
+  CMP EBX,vy2
+  JG @pup32_ende
+
+  MOV EDI,EAX
+  SHL EDI,2
+  PUSH EBX
+  CALL lineofsB
+  ADD EDI,EAX
+
+  MOV EAX,f
+  MOV [EDI],EAX
+@pup32_ende:
+END;
+
+{============================= getpixel ===================================}
+
+FUNCTION getpixelB8(x,y:longint):longint;assembler;
+ASM
+  MOV EAX,x
+  MOV EBX,y
+  CMP EAX,vx1
+  JL @gep8_ende
+  CMP EBX,vy1
+  JL @gep8_ende
+  CMP EAX,vx2
+  JG @gep8_ende
+  CMP EBX,vy2
+  JG @gep8_ende
+
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB8
+  ADD EAX,VGAbase
+  MOVZX EAX,BYTE PTR [EAX]
+@gep8_ende:
+END;
+
+FUNCTION getpixelB16(x,y:longint):longint;assembler;
+ASM
+  MOV EAX,x
+  MOV EBX,y
+  CMP EAX,vx1
+  JL @gep16_ende
+  CMP EBX,vy1
+  JL @gep16_ende
+  CMP EAX,vx2
+  JG @gep16_ende
+  CMP EBX,vy2
+  JG @gep16_ende
+
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB16
+  ADD EAX,VGAbase
+  MOVZX EAX,WORD PTR [EAX]
+@gep16_ende:
+END;
+
+FUNCTION getpixelB24(x,y:longint):longint;assembler;
+ASM
+  MOV EAX,x
+  MOV EBX,y
+  CMP EAX,vx1
+  JL @gep24_ende
+  CMP EBX,vy1
+  JL @gep24_ende
+  CMP EAX,vx2
+  JG @gep24_ende
+  CMP EBX,vy2
+  JG @gep24_ende
+
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB24
+  ADD EAX,VGAbase
+  MOV EDI,EAX
+  MOVZX EAX,WORD PTR [EDI]
+  ROR EAX,16
+  MOV AL,BYTE PTR [EDI+2]
+  ROR EAX,16
+@gep24_ende:
+END;
+
+FUNCTION getpixelB32(x,y:longint):longint;assembler;
+ASM
+  MOV EAX,x
+  MOV EBX,y
+  CMP EAX,vx1
+  JL @gep32_ende
+  CMP EBX,vy1
+  JL @gep32_ende
+  CMP EAX,vx2
+  JG @gep32_ende
+  CMP EBX,vy2
+  JG @gep32_ende
+
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB32
+  ADD EAX,VGAbase
+  MOV EAX,[EAX]
+@gep32_ende:
+END;
+
+{=============================== lineB ====================================}
+
+PROCEDURE lineB8(x1,y1,x2,y2,f:longint);assembler;
+ASM
+  MOV EAX,x1
+  MOV ESI,y1
+  MOV ECX,x2
+  MOV EDX,y2
+
+  SUB ECX,EAX
+  SUB EDX,ESI
+
+  OR ECX,ECX
+  JNS @linB8_w1
+  NEG ECX
+@linB8_w1:
+
+  OR EDX,EDX
+  JNS @linB8_w2
+  NEG EDX
+@linB8_w2:
+
+  CMP ECX,EDX
+  JG @linB8_xcnt
+{----------}
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP ESI,EDX
+  JL @linB8_w3a
+  XCHG EAX,ECX
+  XCHG ESI,EDX
+@linB8_w3a:
+
+  SUB ECX,EAX
+  SUB EDX,ESI
+  MOV EBX,ECX
+  SAR EBX,31
+  ADD ECX,EBX
+  INC EDX
+  XCHG ECX,EDX
+  SHL EAX,16
+  SHL EDX,16
+  OR EAX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  PUSH EDX
+  SAR EDX,1
+  ADD EAX,EDX
+  POP EDX
+
+@linB8_loop1a:
+  PUSH EAX
+  PUSH EDX
+  PUSH ESI
+  PUSH ECX
+
+  SHR EAX,16
+
+  CMP EAX,vx1
+  JL @linB8_nopixa
+  CMP ESI,vy1
+  JL @linB8_nopixa
+  CMP EAX,vx2
+  JG @linB8_nopixa
+  CMP ESI,vy2
+  JG @linB8_nopixa
+
+  MOV EDI,EAX
+  PUSH ESI
+  CALL lineofsB
+  MOV EBX,f
+  MOV [EDI+EAX],BL
+@linB8_nopixa:
+
+  POP ECX
+  POP ESI
+  POP EDX
+  POP EAX
+
+  ADD EAX,EDX
+  INC ESI
+
+  DEC ECX
+  JNZ @linB8_loop1a
+  JMP @linB8_ende
+{----------}
+@linB8_xcnt:
+
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EAX,ECX
+  JL @linB8_w3b
+  XCHG EAX,ECX
+  XCHG ESI,EDX
+@linB8_w3b:
+
+  SUB ECX,EAX
+  SUB EDX,ESI
+  INC ECX
+  MOV EBX,EDX
+  SAR EBX,31
+  ADD EDX,EBX
+  SHL ESI,16
+  SHL EDX,16
+  OR ESI,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  PUSH EDX
+  SAR EDX,1
+  ADD ESI,EDX
+  POP EDX
+
+@linB8_loop1b:
+
+  PUSH ESI
+  PUSH EDX
+  PUSH EAX
+  PUSH ECX
+
+  SHR ESI,16
+
+  CMP EAX,vx1
+  JL @linB8_nopixb
+  CMP ESI,vy1
+  JL @linB8_nopixb
+  CMP EAX,vx2
+  JG @linB8_nopixb
+  CMP ESI,vy2
+  JG @linB8_nopixb
+
+  MOV EDI,EAX
+  PUSH ESI
+  CALL lineofsB
+  MOV EBX,f
+  MOV [EDI+EAX],BL
+@linB8_nopixb:
+
+  POP ECX
+  POP EAX
+  POP EDX
+  POP ESI
+
+  ADD ESI,EDX
+  INC EAX
+
+  DEC ECX
+  JNZ @linB8_loop1b
+@linB8_ende:
+END;
+
+PROCEDURE lineB16(x1,y1,x2,y2,f:longint);assembler;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV ECX,x2
+  MOV EDX,y2
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+
+  OR ECX,ECX
+  JNS @linB16_w1
+  NEG ECX
+@linB16_w1:
+
+  OR EDX,EDX
+  JNS @linB16_w2
+  NEG EDX
+@linB16_w2:
+
+  CMP ECX,EDX
+  JG @linB16_xcnt
+{----------}
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EBX,EDX
+  JL @linB16_w3a
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB16_w3a:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  MOV ESI,ECX
+  SAR ESI,31
+  ADD ECX,ESI
+  INC EDX
+  XCHG ECX,EDX
+  SHL EAX,16
+  SHL EDX,16
+  OR EAX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  PUSH EDX
+  SAR EDX,1
+  ADD EAX,EDX
+  POP EDX
+  MOV ESI,f
+
+@linB16_loop1a:
+  PUSH EAX
+  PUSH EDX
+  PUSH EBX
+  PUSH ECX
+
+  SHR EAX,16
+
+  CMP EAX,vx1
+  JL @linB16_nopixa
+  CMP EBX,vy1
+  JL @linB16_nopixa
+  CMP EAX,vx2
+  JG @linB16_nopixa
+  CMP EBX,vy2
+  JG @linB16_nopixa
+
+  MOV EDI,EAX
+  SHL EDI,1
+  PUSH EBX
+  CALL lineofsB
+  ADD EDI,EAX
+  MOV [EDI],SI
+@linB16_nopixa:
+
+  POP ECX
+  POP EBX
+  POP EDX
+  POP EAX
+
+  ADD EAX,EDX
+  INC EBX
+
+  DEC ECX
+  JNZ @linB16_loop1a
+  JMP @linB16_ende
+{----------}
+@linB16_xcnt:
+
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EAX,ECX
+  JL @linB16_w3b
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB16_w3b:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  INC ECX
+  MOV ESI,EDX
+  SAR ESI,31
+  ADD EDX,ESI
+  SHL EBX,16
+  SHL EDX,16
+  OR EBX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  PUSH EDX
+  SAR EDX,1
+  ADD EBX,EDX
+  POP EDX
+  MOV ESI,f
+
+@linB16_loop1b:
+
+  PUSH EBX
+  PUSH EDX
+  PUSH EAX
+  PUSH ECX
+
+  SHR EBX,16
+
+  CMP EAX,vx1
+  JL @linB16_nopixb
+  CMP EBX,vy1
+  JL @linB16_nopixb
+  CMP EAX,vx2
+  JG @linB16_nopixb
+  CMP EBX,vy2
+  JG @linB16_nopixb
+
+  MOV EDI,EAX
+  PUSH EBX
+  CALL lineofsB
+  MOV [EAX+EDI*2],SI
+@linB16_nopixb:
+
+  POP ECX
+  POP EAX
+  POP EDX
+  POP EBX
+
+  ADD EBX,EDX
+  INC EAX
+
+  DEC ECX
+  JNZ @linB16_loop1b
+@linB16_ende:
+END;
+
+PROCEDURE lineB24(x1,y1,x2,y2,f:longint);assembler;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV ECX,x2
+  MOV EDX,y2
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+
+  OR ECX,ECX
+  JNS @linB24_w1
+  NEG ECX
+@linB24_w1:
+
+  OR EDX,EDX
+  JNS @linB24_w2
+  NEG EDX
+@linB24_w2:
+
+  CMP ECX,EDX
+  JG @linB24_xcnt
+{----------}
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EBX,EDX
+  JL @linB24_w3a
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB24_w3a:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  MOV ESI,ECX
+  SAR ESI,31
+  ADD ECX,ESI
+  INC EDX
+  XCHG ECX,EDX
+  SHL EAX,16
+  SHL EDX,16
+  OR EAX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  PUSH EDX
+  SAR EDX,1
+  ADD EAX,EDX
+  POP EDX
+  MOV ESI,f
+
+@linB24_loop1a:
+  PUSH EAX
+  PUSH EDX
+  PUSH EBX
+  PUSH ECX
+
+  SHR EAX,16
+
+  CMP EAX,vx1
+  JL @linB24_nopixa
+  CMP EBX,vy1
+  JL @linB24_nopixa
+  CMP EAX,vx2
+  JG @linB24_nopixa
+  CMP EBX,vy2
+  JG @linB24_nopixa
+
+  MOV EDI,EAX
+  SHL EDI,1
+  ADD EDI,EAX
+  PUSH EBX
+  CALL lineofsB
+  ADD EDI,EAX
+  MOV EAX,ESI
+  STOSW
+  SHR EAX,16
+  MOV [EDI],AL
+@linB24_nopixa:
+
+  POP ECX
+  POP EBX
+  POP EDX
+  POP EAX
+
+  ADD EAX,EDX
+  INC EBX
+
+  DEC ECX
+  JNZ @linB24_loop1a
+  JMP @linB24_ende
+{----------}
+@linB24_xcnt:
+
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EAX,ECX
+  JL @linB24_w3b
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB24_w3b:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  INC ECX
+  MOV ESI,EDX
+  SAR ESI,31
+  ADD EDX,ESI
+  SHL EBX,16
+  SHL EDX,16
+  OR EBX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  PUSH EDX
+  SAR EDX,1
+  ADD EBX,EDX
+  POP EDX
+  MOV ESI,f
+
+@linB24_loop1b:
+
+  PUSH EBX
+  PUSH EDX
+  PUSH EAX
+  PUSH ECX
+
+  SHR EBX,16
+
+  CMP EAX,vx1
+  JL @linB24_nopixb
+  CMP EBX,vy1
+  JL @linB24_nopixb
+  CMP EAX,vx2
+  JG @linB24_nopixb
+  CMP EBX,vy2
+  JG @linB24_nopixb
+
+  MOV EDI,EAX
+  SHL EDI,1
+  ADD EDI,EAX
+  PUSH EBX
+  CALL lineofsB
+  ADD EDI,EAX
+  MOV EAX,ESI
+  STOSW
+  SHR EAX,16
+  MOV [EDI],AL
+@linB24_nopixb:
+
+  POP ECX
+  POP EAX
+  POP EDX
+  POP EBX
+
+  ADD EBX,EDX
+  INC EAX
+
+  DEC ECX
+  JNZ @linB24_loop1b
+@linB24_ende:
+END;
+
+PROCEDURE lineB32(x1,y1,x2,y2,f:longint);assembler;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV ECX,x2
+  MOV EDX,y2
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+
+  OR ECX,ECX
+  JNS @linB32_w1
+  NEG ECX
+@linB32_w1:
+
+  OR EDX,EDX
+  JNS @linB32_w2
+  NEG EDX
+@linB32_w2:
+
+  CMP ECX,EDX
+  JG @linB32_xcnt
+{----------}
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EBX,EDX
+  JL @linB32_w3a
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB32_w3a:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  MOV ESI,ECX
+  SAR ESI,31
+  ADD ECX,ESI
+  INC EDX
+  XCHG ECX,EDX
+  SHL EAX,16
+  SHL EDX,16
+  OR EAX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  PUSH EDX
+  SAR EDX,1
+  ADD EAX,EDX
+  POP EDX
+  MOV ESI,f
+
+@linB32_loop1a:
+  PUSH EAX
+  PUSH EDX
+  PUSH EBX
+  PUSH ECX
+
+  SHR EAX,16
+
+  CMP EAX,vx1
+  JL @linB32_nopixa
+  CMP EBX,vy1
+  JL @linB32_nopixa
+  CMP EAX,vx2
+  JG @linB32_nopixa
+  CMP EBX,vy2
+  JG @linB32_nopixa
+
+  MOV EDI,EAX
+  PUSH EBX
+  CALL lineofsB
+  MOV [EAX+EDI*4],ESI
+@linB32_nopixa:
+
+  POP ECX
+  POP EBX
+  POP EDX
+  POP EAX
+
+  ADD EAX,EDX
+  INC EBX
+
+  DEC ECX
+  JNZ @linB32_loop1a
+  JMP @linB32_ende
+{----------}
+@linB32_xcnt:
+
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EAX,ECX
+  JL @linB32_w3b
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB32_w3b:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  INC ECX
+  MOV ESI,EDX
+  SAR ESI,31
+  ADD EDX,ESI
+  SHL EBX,16
+  SHL EDX,16
+  OR EBX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  PUSH EDX
+  SAR EDX,1
+  ADD EBX,EDX
+  POP EDX
+  MOV ESI,f
+
+@linB32_loop1b:
+
+  PUSH EBX
+  PUSH EDX
+  PUSH EAX
+  PUSH ECX
+
+  SHR EBX,16
+
+  CMP EAX,vx1
+  JL @linB32_nopixb
+  CMP EBX,vy1
+  JL @linB32_nopixb
+  CMP EAX,vx2
+  JG @linB32_nopixb
+  CMP EBX,vy2
+  JG @linB32_nopixb
+
+  MOV EDI,EAX
+  PUSH EBX
+  CALL lineofsB
+  MOV [EAX+EDI*4],ESI
+@linB32_nopixb:
+
+  POP ECX
+  POP EAX
+  POP EDX
+  POP EBX
+
+  ADD EBX,EDX
+  INC EAX
+
+  DEC ECX
+  JNZ @linB32_loop1b
+@linB32_ende:
+END;
+
+{=============================== lineXORB ====================================}
+
+PROCEDURE lineXORB8(x1,y1,x2,y2,f:longint);assembler;
+ASM
+  MOV EAX,x1
+  MOV ESI,y1
+  MOV ECX,x2
+  MOV EDX,y2
+
+  SUB ECX,EAX
+  SUB EDX,ESI
+
+  OR ECX,ECX
+  JNS @linB8_w1
+  NEG ECX
+@linB8_w1:
+
+  OR EDX,EDX
+  JNS @linB8_w2
+  NEG EDX
+@linB8_w2:
+
+  CMP ECX,EDX
+  JG @linB8_xcnt
+{----------}
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP ESI,EDX
+  JL @linB8_w3a
+  XCHG EAX,ECX
+  XCHG ESI,EDX
+@linB8_w3a:
+
+  SUB ECX,EAX
+  SUB EDX,ESI
+  MOV EBX,ECX
+  SAR EBX,31
+  ADD ECX,EBX
+  INC EDX
+  XCHG ECX,EDX
+  SHL EAX,16
+  SHL EDX,16
+  OR EAX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  PUSH EDX
+  SAR EDX,1
+  ADD EAX,EDX
+  POP EDX
+
+@linB8_loop1a:
+  PUSH EAX
+  PUSH EDX
+  PUSH ESI
+  PUSH ECX
+
+  SHR EAX,16
+
+  CMP EAX,vx1
+  JL @linB8_nopixa
+  CMP ESI,vy1
+  JL @linB8_nopixa
+  CMP EAX,vx2
+  JG @linB8_nopixa
+  CMP ESI,vy2
+  JG @linB8_nopixa
+
+  MOV EDI,EAX
+  PUSH ESI
+  CALL lineofsB
+  MOV EBX,f
+  XOR [EDI+EAX],BL
+@linB8_nopixa:
+
+  POP ECX
+  POP ESI
+  POP EDX
+  POP EAX
+
+  ADD EAX,EDX
+  INC ESI
+
+  DEC ECX
+  JNZ @linB8_loop1a
+  JMP @linB8_ende
+{----------}
+@linB8_xcnt:
+
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EAX,ECX
+  JL @linB8_w3b
+  XCHG EAX,ECX
+  XCHG ESI,EDX
+@linB8_w3b:
+
+  SUB ECX,EAX
+  SUB EDX,ESI
+  INC ECX
+  MOV EBX,EDX
+  SAR EBX,31
+  ADD EDX,EBX
+  SHL ESI,16
+  SHL EDX,16
+  OR ESI,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  PUSH EDX
+  SAR EDX,1
+  ADD ESI,EDX
+  POP EDX
+
+@linB8_loop1b:
+
+  PUSH ESI
+  PUSH EDX
+  PUSH EAX
+  PUSH ECX
+
+  SHR ESI,16
+
+  CMP EAX,vx1
+  JL @linB8_nopixb
+  CMP ESI,vy1
+  JL @linB8_nopixb
+  CMP EAX,vx2
+  JG @linB8_nopixb
+  CMP ESI,vy2
+  JG @linB8_nopixb
+
+  MOV EDI,EAX
+  PUSH ESI
+  CALL lineofsB
+  MOV EBX,f
+  XOR [EDI+EAX],BL
+@linB8_nopixb:
+
+  POP ECX
+  POP EAX
+  POP EDX
+  POP ESI
+
+  ADD ESI,EDX
+  INC EAX
+
+  DEC ECX
+  JNZ @linB8_loop1b
+@linB8_ende:
+END;
+
+PROCEDURE lineXORB16(x1,y1,x2,y2,f:longint);assembler;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV ECX,x2
+  MOV EDX,y2
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+
+  OR ECX,ECX
+  JNS @linB16_w1
+  NEG ECX
+@linB16_w1:
+
+  OR EDX,EDX
+  JNS @linB16_w2
+  NEG EDX
+@linB16_w2:
+
+  CMP ECX,EDX
+  JG @linB16_xcnt
+{----------}
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EBX,EDX
+  JL @linB16_w3a
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB16_w3a:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  MOV ESI,ECX
+  SAR ESI,31
+  ADD ECX,ESI
+  INC EDX
+  XCHG ECX,EDX
+  SHL EAX,16
+  SHL EDX,16
+  OR EAX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  PUSH EDX
+  SAR EDX,1
+  ADD EAX,EDX
+  POP EDX
+  MOV ESI,f
+
+@linB16_loop1a:
+  PUSH EAX
+  PUSH EDX
+  PUSH EBX
+  PUSH ECX
+
+  SHR EAX,16
+
+  CMP EAX,vx1
+  JL @linB16_nopixa
+  CMP EBX,vy1
+  JL @linB16_nopixa
+  CMP EAX,vx2
+  JG @linB16_nopixa
+  CMP EBX,vy2
+  JG @linB16_nopixa
+
+  MOV EDI,EAX
+  SHL EDI,1
+  PUSH EBX
+  CALL lineofsB
+  ADD EDI,EAX
+  XOR [EDI],SI
+@linB16_nopixa:
+
+  POP ECX
+  POP EBX
+  POP EDX
+  POP EAX
+
+  ADD EAX,EDX
+  INC EBX
+
+  DEC ECX
+  JNZ @linB16_loop1a
+  JMP @linB16_ende
+{----------}
+@linB16_xcnt:
+
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EAX,ECX
+  JL @linB16_w3b
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB16_w3b:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  INC ECX
+  MOV ESI,EDX
+  SAR ESI,31
+  ADD EDX,ESI
+  SHL EBX,16
+  SHL EDX,16
+  OR EBX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  PUSH EDX
+  SAR EDX,1
+  ADD EBX,EDX
+  POP EDX
+  MOV ESI,f
+
+@linB16_loop1b:
+
+  PUSH EBX
+  PUSH EDX
+  PUSH EAX
+  PUSH ECX
+
+  SHR EBX,16
+
+  CMP EAX,vx1
+  JL @linB16_nopixb
+  CMP EBX,vy1
+  JL @linB16_nopixb
+  CMP EAX,vx2
+  JG @linB16_nopixb
+  CMP EBX,vy2
+  JG @linB16_nopixb
+
+  MOV EDI,EAX
+  PUSH EBX
+  CALL lineofsB
+  XOR [EAX+EDI*2],SI
+@linB16_nopixb:
+
+  POP ECX
+  POP EAX
+  POP EDX
+  POP EBX
+
+  ADD EBX,EDX
+  INC EAX
+
+  DEC ECX
+  JNZ @linB16_loop1b
+@linB16_ende:
+END;
+
+PROCEDURE lineXORB24(x1,y1,x2,y2,f:longint);assembler;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV ECX,x2
+  MOV EDX,y2
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+
+  OR ECX,ECX
+  JNS @linB24_w1
+  NEG ECX
+@linB24_w1:
+
+  OR EDX,EDX
+  JNS @linB24_w2
+  NEG EDX
+@linB24_w2:
+
+  CMP ECX,EDX
+  JG @linB24_xcnt
+{----------}
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EBX,EDX
+  JL @linB24_w3a
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB24_w3a:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  MOV ESI,ECX
+  SAR ESI,31
+  ADD ECX,ESI
+  INC EDX
+  XCHG ECX,EDX
+  SHL EAX,16
+  SHL EDX,16
+  OR EAX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  PUSH EDX
+  SAR EDX,1
+  ADD EAX,EDX
+  POP EDX
+  MOV ESI,f
+
+@linB24_loop1a:
+  PUSH EAX
+  PUSH EDX
+  PUSH EBX
+  PUSH ECX
+
+  SHR EAX,16
+
+  CMP EAX,vx1
+  JL @linB24_nopixa
+  CMP EBX,vy1
+  JL @linB24_nopixa
+  CMP EAX,vx2
+  JG @linB24_nopixa
+  CMP EBX,vy2
+  JG @linB24_nopixa
+
+  MOV EDI,EAX
+  SHL EDI,1
+  ADD EDI,EAX
+  PUSH EBX
+  CALL lineofsB
+  ADD EDI,EAX
+  MOV EAX,ESI
+  XOR [EDI],AX
+  SHR EAX,16
+  XOR [EDI+2],AL
+@linB24_nopixa:
+
+  POP ECX
+  POP EBX
+  POP EDX
+  POP EAX
+
+  ADD EAX,EDX
+  INC EBX
+
+  DEC ECX
+  JNZ @linB24_loop1a
+  JMP @linB24_ende
+{----------}
+@linB24_xcnt:
+
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EAX,ECX
+  JL @linB24_w3b
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB24_w3b:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  INC ECX
+  MOV ESI,EDX
+  SAR ESI,31
+  ADD EDX,ESI
+  SHL EBX,16
+  SHL EDX,16
+  OR EBX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  PUSH EDX
+  SAR EDX,1
+  ADD EBX,EDX
+  POP EDX
+  MOV ESI,f
+
+@linB24_loop1b:
+
+  PUSH EBX
+  PUSH EDX
+  PUSH EAX
+  PUSH ECX
+
+  SHR EBX,16
+
+  CMP EAX,vx1
+  JL @linB24_nopixb
+  CMP EBX,vy1
+  JL @linB24_nopixb
+  CMP EAX,vx2
+  JG @linB24_nopixb
+  CMP EBX,vy2
+  JG @linB24_nopixb
+
+  MOV EDI,EAX
+  SHL EDI,1
+  ADD EDI,EAX
+  PUSH EBX
+  CALL lineofsB
+  ADD EDI,EAX
+  MOV EAX,ESI
+  XOR [EDI],AX
+  SHR EAX,16
+  XOR [EDI+2],AL
+@linB24_nopixb:
+
+  POP ECX
+  POP EAX
+  POP EDX
+  POP EBX
+
+  ADD EBX,EDX
+  INC EAX
+
+  DEC ECX
+  JNZ @linB24_loop1b
+@linB24_ende:
+END;
+
+PROCEDURE lineXORB32(x1,y1,x2,y2,f:longint);assembler;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV ECX,x2
+  MOV EDX,y2
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+
+  OR ECX,ECX
+  JNS @linB32_w1
+  NEG ECX
+@linB32_w1:
+
+  OR EDX,EDX
+  JNS @linB32_w2
+  NEG EDX
+@linB32_w2:
+
+  CMP ECX,EDX
+  JG @linB32_xcnt
+{----------}
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EBX,EDX
+  JL @linB32_w3a
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB32_w3a:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  MOV ESI,ECX
+  SAR ESI,31
+  ADD ECX,ESI
+  INC EDX
+  XCHG ECX,EDX
+  SHL EAX,16
+  SHL EDX,16
+  OR EAX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  PUSH EDX
+  SAR EDX,1
+  ADD EAX,EDX
+  POP EDX
+  MOV ESI,f
+
+@linB32_loop1a:
+  PUSH EAX
+  PUSH EDX
+  PUSH EBX
+  PUSH ECX
+
+  SHR EAX,16
+
+  CMP EAX,vx1
+  JL @linB32_nopixa
+  CMP EBX,vy1
+  JL @linB32_nopixa
+  CMP EAX,vx2
+  JG @linB32_nopixa
+  CMP EBX,vy2
+  JG @linB32_nopixa
+
+  MOV EDI,EAX
+  PUSH EBX
+  CALL lineofsB
+  XOR [EAX+EDI*4],ESI
+@linB32_nopixa:
+
+  POP ECX
+  POP EBX
+  POP EDX
+  POP EAX
+
+  ADD EAX,EDX
+  INC EBX
+
+  DEC ECX
+  JNZ @linB32_loop1a
+  JMP @linB32_ende
+{----------}
+@linB32_xcnt:
+
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EAX,ECX
+  JL @linB32_w3b
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB32_w3b:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  INC ECX
+  MOV ESI,EDX
+  SAR ESI,31
+  ADD EDX,ESI
+  SHL EBX,16
+  SHL EDX,16
+  OR EBX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  PUSH EDX
+  SAR EDX,1
+  ADD EBX,EDX
+  POP EDX
+  MOV ESI,f
+
+@linB32_loop1b:
+
+  PUSH EBX
+  PUSH EDX
+  PUSH EAX
+  PUSH ECX
+
+  SHR EBX,16
+
+  CMP EAX,vx1
+  JL @linB32_nopixb
+  CMP EBX,vy1
+  JL @linB32_nopixb
+  CMP EAX,vx2
+  JG @linB32_nopixb
+  CMP EBX,vy2
+  JG @linB32_nopixb
+
+  MOV EDI,EAX
+  PUSH EBX
+  CALL lineofsB
+  XOR [EAX+EDI*4],ESI
+@linB32_nopixb:
+
+  POP ECX
+  POP EAX
+  POP EDX
+  POP EBX
+
+  ADD EBX,EDX
+  INC EAX
+
+  DEC ECX
+  JNZ @linB32_loop1b
+@linB32_ende:
+END;
+
+{=============================== linepatternB ===============================}
+
+PROCEDURE linepatternB8(x1,y1,x2,y2,f,pat,bits:longint);assembler;
+VAR il:dword;
+ASM
+  MOV EBX,bits
+  AND EBX,1Fh
+  MOV EAX,pat
+  SHL EAX,1
+  OR EAX,1
+  MOV ECX,31
+  SUB ECX,EBX
+  SHL EAX,CL
+  MOV pat,EAX
+
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV ECX,x2
+  MOV EDX,y2
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+
+  OR ECX,ECX
+  JNS @linB8_w1
+  NEG ECX
+@linB8_w1:
+
+  OR EDX,EDX
+  JNS @linB8_w2
+  NEG EDX
+@linB8_w2:
+
+  CMP ECX,EDX
+  JG @linB8_xcnt
+{----------}
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EBX,EDX
+  JL @linB8_w3a
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB8_w3a:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  MOV ESI,ECX
+  SAR ESI,31
+  ADD ECX,ESI
+  INC EDX
+  XCHG ECX,EDX
+  SHL EAX,16
+  SHL EDX,16
+  OR EAX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  MOV il,EDX
+  SAR EDX,1
+  ADD EAX,EDX
+
+  MOV EDX,pat
+  MOV ESI,f
+
+@linB8_loop1a:
+  PUSH EAX
+  PUSH EBX
+  PUSH ECX
+
+  SHR EAX,16
+
+  CMP EAX,vx1
+  JL @linB8_nopixa
+  CMP EBX,vy1
+  JL @linB8_nopixa
+  CMP EAX,vx2
+  JG @linB8_nopixa
+  CMP EBX,vy2
+  JG @linB8_nopixa
+
+  TEST EDX,80000000h
+  JZ @linB8_nopixa
+  PUSH EDX
+  MOV EDI,EAX
+  PUSH EBX
+  CALL lineofsB
+  MOV EDX,ESI
+  MOV [EAX+EDI],DL
+  POP EDX
+@linB8_nopixa:
+  SHL EDX,1
+  TEST EDX,7FFFFFFFh
+  JNZ @linB8_norealoada
+  MOV EDX,pat
+@linB8_norealoada:
+
+  POP ECX
+  POP EBX
+  POP EAX
+
+  ADD EAX,il
+  INC EBX
+
+  DEC ECX
+  JNZ @linB8_loop1a
+  JMP @linB8_ende
+{----------}
+@linB8_xcnt:
+
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EAX,ECX
+  JL @linB8_w3b
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB8_w3b:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  INC ECX
+  MOV ESI,EDX
+  SAR ESI,31
+  ADD EDX,ESI
+  SHL EBX,16
+  SHL EDX,16
+  OR EBX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  MOV il,EDX
+  SAR EDX,1
+  ADD EBX,EDX
+
+  MOV EDX,pat
+  MOV ESI,f
+
+@linB8_loop1b:
+
+  PUSH EBX
+  PUSH EAX
+  PUSH ECX
+
+  SHR EBX,16
+
+  CMP EAX,vx1
+  JL @linB8_nopixb
+  CMP EBX,vy1
+  JL @linB8_nopixb
+  CMP EAX,vx2
+  JG @linB8_nopixb
+  CMP EBX,vy2
+  JG @linB8_nopixb
+
+  TEST EDX,80000000h
+  JZ @linB8_nopixb
+  PUSH EDX
+  MOV EDI,EAX
+  PUSH EBX
+  CALL lineofsB
+  MOV EDX,ESI
+  MOV [EAX+EDI],DL
+  POP EDX
+@linB8_nopixb:
+  SHL EDX,1
+  TEST EDX,7FFFFFFFh
+  JNZ @linB8_norealoadb
+  MOV EDX,pat
+@linB8_norealoadb:
+
+  POP ECX
+  POP EAX
+  POP EBX
+
+  ADD EBX,il
+  INC EAX
+
+  DEC ECX
+  JNZ @linB8_loop1b
+@linB8_ende:
+END;
+
+PROCEDURE linepatternB16(x1,y1,x2,y2,f,pat,bits:longint);assembler;
+VAR il:dword;
+ASM
+  MOV EBX,bits
+  AND EBX,1Fh
+  MOV EAX,pat
+  SHL EAX,1
+  OR EAX,1
+  MOV ECX,31
+  SUB ECX,EBX
+  SHL EAX,CL
+  MOV pat,EAX
+
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV ECX,x2
+  MOV EDX,y2
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+
+  OR ECX,ECX
+  JNS @linB16_w1
+  NEG ECX
+@linB16_w1:
+
+  OR EDX,EDX
+  JNS @linB16_w2
+  NEG EDX
+@linB16_w2:
+
+  CMP ECX,EDX
+  JG @linB16_xcnt
+{----------}
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EBX,EDX
+  JL @linB16_w3a
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB16_w3a:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  MOV ESI,ECX
+  SAR ESI,31
+  ADD ECX,ESI
+  INC EDX
+  XCHG ECX,EDX
+  SHL EAX,16
+  SHL EDX,16
+  OR EAX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  MOV il,EDX
+  SAR EDX,1
+  ADD EAX,EDX
+
+  MOV EDX,pat
+  MOV ESI,f
+
+@linB16_loop1a:
+  PUSH EAX
+  PUSH EBX
+  PUSH ECX
+
+  SHR EAX,16
+
+  CMP EAX,vx1
+  JL @linB16_nopixa
+  CMP EBX,vy1
+  JL @linB16_nopixa
+  CMP EAX,vx2
+  JG @linB16_nopixa
+  CMP EBX,vy2
+  JG @linB16_nopixa
+
+  TEST EDX,80000000h
+  JZ @linB16_nopixa
+  PUSH EDX
+  LEA EDI,[EAX*2]
+  PUSH EBX
+  CALL lineofsB
+  MOV [EAX+EDI],SI
+  POP EDX
+@linB16_nopixa:
+  SHL EDX,1
+  TEST EDX,7FFFFFFFh
+  JNZ @linB16_norealoada
+  MOV EDX,pat
+@linB16_norealoada:
+
+  POP ECX
+  POP EBX
+  POP EAX
+
+  ADD EAX,il
+  INC EBX
+
+  DEC ECX
+  JNZ @linB16_loop1a
+  JMP @linB16_ende
+{----------}
+@linB16_xcnt:
+
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EAX,ECX
+  JL @linB16_w3b
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB16_w3b:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  INC ECX
+  MOV ESI,EDX
+  SAR ESI,31
+  ADD EDX,ESI
+  SHL EBX,16
+  SHL EDX,16
+  OR EBX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  MOV il,EDX
+  SAR EDX,1
+  ADD EBX,EDX
+
+  MOV EDX,pat
+  MOV ESI,f
+
+@linB16_loop1b:
+
+  PUSH EBX
+  PUSH EAX
+  PUSH ECX
+
+  SHR EBX,16
+
+  CMP EAX,vx1
+  JL @linB16_nopixb
+  CMP EBX,vy1
+  JL @linB16_nopixb
+  CMP EAX,vx2
+  JG @linB16_nopixb
+  CMP EBX,vy2
+  JG @linB16_nopixb
+
+  TEST EDX,80000000h
+  JZ @linB16_nopixb
+  PUSH EDX
+  LEA EDI,[EAX*2]
+  PUSH EBX
+  CALL lineofsB
+  MOV [EAX+EDI],SI
+  POP EDX
+@linB16_nopixb:
+  SHL EDX,1
+  TEST EDX,7FFFFFFFh
+  JNZ @linB16_norealoadb
+  MOV EDX,pat
+@linB16_norealoadb:
+
+  POP ECX
+  POP EAX
+  POP EBX
+
+  ADD EBX,il
+  INC EAX
+
+  DEC ECX
+  JNZ @linB16_loop1b
+@linB16_ende:
+END;
+
+PROCEDURE linepatternB24(x1,y1,x2,y2,f,pat,bits:longint);assembler;
+VAR il:dword;
+ASM
+  MOV EBX,bits
+  AND EBX,1Fh
+  MOV EAX,pat
+  SHL EAX,1
+  OR EAX,1
+  MOV ECX,31
+  SUB ECX,EBX
+  SHL EAX,CL
+  MOV pat,EAX
+
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV ECX,x2
+  MOV EDX,y2
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+
+  OR ECX,ECX
+  JNS @linB24_w1
+  NEG ECX
+@linB24_w1:
+
+  OR EDX,EDX
+  JNS @linB24_w2
+  NEG EDX
+@linB24_w2:
+
+  CMP ECX,EDX
+  JG @linB24_xcnt
+{----------}
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EBX,EDX
+  JL @linB24_w3a
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB24_w3a:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  MOV ESI,ECX
+  SAR ESI,31
+  ADD ECX,ESI
+  INC EDX
+  XCHG ECX,EDX
+  SHL EAX,16
+  SHL EDX,16
+  OR EAX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  MOV il,EDX
+  SAR EDX,1
+  ADD EAX,EDX
+
+  MOV EDX,pat
+  MOV ESI,f
+
+@linB24_loop1a:
+  PUSH EAX
+  PUSH EBX
+  PUSH ECX
+
+  SHR EAX,16
+
+  CMP EAX,vx1
+  JL @linB24_nopixa
+  CMP EBX,vy1
+  JL @linB24_nopixa
+  CMP EAX,vx2
+  JG @linB24_nopixa
+  CMP EBX,vy2
+  JG @linB24_nopixa
+
+  TEST EDX,80000000h
+  JZ @linB24_nopixa
+  PUSH EDX
+  LEA EDI,[EAX*2+EAX]
+  PUSH EBX
+  CALL lineofsB
+  MOV EDX,ESI
+  SHR ESI,8
+  MOV [EAX+EDI],DL
+  MOV [EAX+EDI+1],SI
+  POP EDX
+@linB24_nopixa:
+  SHL EDX,1
+  TEST EDX,7FFFFFFFh
+  JNZ @linB24_norealoada
+  MOV EDX,pat
+@linB24_norealoada:
+
+  POP ECX
+  POP EBX
+  POP EAX
+
+  ADD EAX,il
+  INC EBX
+
+  DEC ECX
+  JNZ @linB24_loop1a
+  JMP @linB24_ende
+{----------}
+@linB24_xcnt:
+
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EAX,ECX
+  JL @linB24_w3b
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB24_w3b:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  INC ECX
+  MOV ESI,EDX
+  SAR ESI,31
+  ADD EDX,ESI
+  SHL EBX,16
+  SHL EDX,16
+  OR EBX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  MOV il,EDX
+  SAR EDX,1
+  ADD EBX,EDX
+
+  MOV EDX,pat
+  MOV ESI,f
+
+@linB24_loop1b:
+
+  PUSH EBX
+  PUSH EAX
+  PUSH ECX
+
+  SHR EBX,16
+
+  CMP EAX,vx1
+  JL @linB24_nopixb
+  CMP EBX,vy1
+  JL @linB24_nopixb
+  CMP EAX,vx2
+  JG @linB24_nopixb
+  CMP EBX,vy2
+  JG @linB24_nopixb
+
+  TEST EDX,80000000h
+  JZ @linB24_nopixb
+  PUSH EDX
+  LEA EDI,[EAX*2+EAX]
+  PUSH EBX
+  CALL lineofsB
+  MOV EDX,ESI
+  SHR ESI,8
+  MOV [EAX+EDI],DL
+  MOV [EAX+EDI+1],SI
+  POP EDX
+@linB24_nopixb:
+  SHL EDX,1
+  TEST EDX,7FFFFFFFh
+  JNZ @linB24_norealoadb
+  MOV EDX,pat
+@linB24_norealoadb:
+
+  POP ECX
+  POP EAX
+  POP EBX
+
+  ADD EBX,il
+  INC EAX
+
+  DEC ECX
+  JNZ @linB24_loop1b
+@linB24_ende:
+END;
+
+PROCEDURE linepatternB32(x1,y1,x2,y2,f,pat,bits:longint);assembler;
+VAR il:dword;
+ASM
+  MOV EBX,bits
+  AND EBX,1Fh
+  MOV EAX,pat
+  SHL EAX,1
+  OR EAX,1
+  MOV ECX,31
+  SUB ECX,EBX
+  SHL EAX,CL
+  MOV pat,EAX
+
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV ECX,x2
+  MOV EDX,y2
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+
+  OR ECX,ECX
+  JNS @linB32_w1
+  NEG ECX
+@linB32_w1:
+
+  OR EDX,EDX
+  JNS @linB32_w2
+  NEG EDX
+@linB32_w2:
+
+  CMP ECX,EDX
+  JG @linB32_xcnt
+{----------}
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EBX,EDX
+  JL @linB32_w3a
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB32_w3a:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  MOV ESI,ECX
+  SAR ESI,31
+  ADD ECX,ESI
+  INC EDX
+  XCHG ECX,EDX
+  SHL EAX,16
+  SHL EDX,16
+  OR EAX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  MOV il,EDX
+  SAR EDX,1
+  ADD EAX,EDX
+
+  MOV EDX,pat
+  MOV ESI,f
+
+@linB32_loop1a:
+  PUSH EAX
+  PUSH EBX
+  PUSH ECX
+
+  SHR EAX,16
+
+  CMP EAX,vx1
+  JL @linB32_nopixa
+  CMP EBX,vy1
+  JL @linB32_nopixa
+  CMP EAX,vx2
+  JG @linB32_nopixa
+  CMP EBX,vy2
+  JG @linB32_nopixa
+
+  TEST EDX,80000000h
+  JZ @linB32_nopixa
+  PUSH EDX
+  LEA EDI,[EAX*4]
+  PUSH EBX
+  CALL lineofsB
+  MOV [EAX+EDI],ESI
+  POP EDX
+@linB32_nopixa:
+  SHL EDX,1
+  TEST EDX,7FFFFFFFh
+  JNZ @linB32_norealoada
+  MOV EDX,pat
+@linB32_norealoada:
+
+  POP ECX
+  POP EBX
+  POP EAX
+
+  ADD EAX,il
+  INC EBX
+
+  DEC ECX
+  JNZ @linB32_loop1a
+  JMP @linB32_ende
+{----------}
+@linB32_xcnt:
+
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EAX,ECX
+  JL @linB32_w3b
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB32_w3b:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  INC ECX
+  MOV ESI,EDX
+  SAR ESI,31
+  ADD EDX,ESI
+  SHL EBX,16
+  SHL EDX,16
+  OR EBX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  MOV il,EDX
+  SAR EDX,1
+  ADD EBX,EDX
+
+  MOV EDX,pat
+  MOV ESI,f
+
+@linB32_loop1b:
+
+  PUSH EBX
+  PUSH EAX
+  PUSH ECX
+
+  SHR EBX,16
+
+  CMP EAX,vx1
+  JL @linB32_nopixb
+  CMP EBX,vy1
+  JL @linB32_nopixb
+  CMP EAX,vx2
+  JG @linB32_nopixb
+  CMP EBX,vy2
+  JG @linB32_nopixb
+
+  TEST EDX,80000000h
+  JZ @linB32_nopixb
+  PUSH EDX
+  LEA EDI,[EAX*4]
+  PUSH EBX
+  CALL lineofsB
+  MOV [EAX+EDI],ESI
+  POP EDX
+@linB32_nopixb:
+  SHL EDX,1
+  TEST EDX,7FFFFFFFh
+  JNZ @linB32_norealoadb
+  MOV EDX,pat
+@linB32_norealoadb:
+
+  POP ECX
+  POP EAX
+  POP EBX
+
+  ADD EBX,il
+  INC EAX
+
+  DEC ECX
+  JNZ @linB32_loop1b
+@linB32_ende:
+END;
+
+{=============================== linepatternXORB ===============================}
+
+PROCEDURE linepatternXORB8(x1,y1,x2,y2,f,pat,bits:longint);assembler;
+VAR il:dword;
+ASM
+  MOV EBX,bits
+  AND EBX,1Fh
+  MOV EAX,pat
+  SHL EAX,1
+  OR EAX,1
+  MOV ECX,31
+  SUB ECX,EBX
+  SHL EAX,CL
+  MOV pat,EAX
+
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV ECX,x2
+  MOV EDX,y2
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+
+  OR ECX,ECX
+  JNS @linB8_w1
+  NEG ECX
+@linB8_w1:
+
+  OR EDX,EDX
+  JNS @linB8_w2
+  NEG EDX
+@linB8_w2:
+
+  CMP ECX,EDX
+  JG @linB8_xcnt
+{----------}
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EBX,EDX
+  JL @linB8_w3a
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB8_w3a:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  MOV ESI,ECX
+  SAR ESI,31
+  ADD ECX,ESI
+  INC EDX
+  XCHG ECX,EDX
+  SHL EAX,16
+  SHL EDX,16
+  OR EAX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  MOV il,EDX
+  SAR EDX,1
+  ADD EAX,EDX
+
+  MOV EDX,pat
+  MOV ESI,f
+
+@linB8_loop1a:
+  PUSH EAX
+  PUSH EBX
+  PUSH ECX
+
+  SHR EAX,16
+
+  CMP EAX,vx1
+  JL @linB8_nopixa
+  CMP EBX,vy1
+  JL @linB8_nopixa
+  CMP EAX,vx2
+  JG @linB8_nopixa
+  CMP EBX,vy2
+  JG @linB8_nopixa
+
+  TEST EDX,80000000h
+  JZ @linB8_nopixa
+  PUSH EDX
+  MOV EDI,EAX
+  PUSH EBX
+  CALL lineofsB
+  MOV EDX,ESI
+  XOR [EAX+EDI],DL
+  POP EDX
+@linB8_nopixa:
+  SHL EDX,1
+  TEST EDX,7FFFFFFFh
+  JNZ @linB8_norealoada
+  MOV EDX,pat
+@linB8_norealoada:
+
+  POP ECX
+  POP EBX
+  POP EAX
+
+  ADD EAX,il
+  INC EBX
+
+  DEC ECX
+  JNZ @linB8_loop1a
+  JMP @linB8_ende
+{----------}
+@linB8_xcnt:
+
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EAX,ECX
+  JL @linB8_w3b
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB8_w3b:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  INC ECX
+  MOV ESI,EDX
+  SAR ESI,31
+  ADD EDX,ESI
+  SHL EBX,16
+  SHL EDX,16
+  OR EBX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  MOV il,EDX
+  SAR EDX,1
+  ADD EBX,EDX
+
+  MOV EDX,pat
+  MOV ESI,f
+
+@linB8_loop1b:
+
+  PUSH EBX
+  PUSH EAX
+  PUSH ECX
+
+  SHR EBX,16
+
+  CMP EAX,vx1
+  JL @linB8_nopixb
+  CMP EBX,vy1
+  JL @linB8_nopixb
+  CMP EAX,vx2
+  JG @linB8_nopixb
+  CMP EBX,vy2
+  JG @linB8_nopixb
+
+  TEST EDX,80000000h
+  JZ @linB8_nopixb
+  PUSH EDX
+  MOV EDI,EAX
+  PUSH EBX
+  CALL lineofsB
+  MOV EDX,ESI
+  XOR [EAX+EDI],DL
+  POP EDX
+@linB8_nopixb:
+  SHL EDX,1
+  TEST EDX,7FFFFFFFh
+  JNZ @linB8_norealoadb
+  MOV EDX,pat
+@linB8_norealoadb:
+
+  POP ECX
+  POP EAX
+  POP EBX
+
+  ADD EBX,il
+  INC EAX
+
+  DEC ECX
+  JNZ @linB8_loop1b
+@linB8_ende:
+END;
+
+PROCEDURE linepatternXORB16(x1,y1,x2,y2,f,pat,bits:longint);assembler;
+VAR il:dword;
+ASM
+  MOV EBX,bits
+  AND EBX,1Fh
+  MOV EAX,pat
+  SHL EAX,1
+  OR EAX,1
+  MOV ECX,31
+  SUB ECX,EBX
+  SHL EAX,CL
+  MOV pat,EAX
+
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV ECX,x2
+  MOV EDX,y2
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+
+  OR ECX,ECX
+  JNS @linB16_w1
+  NEG ECX
+@linB16_w1:
+
+  OR EDX,EDX
+  JNS @linB16_w2
+  NEG EDX
+@linB16_w2:
+
+  CMP ECX,EDX
+  JG @linB16_xcnt
+{----------}
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EBX,EDX
+  JL @linB16_w3a
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB16_w3a:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  MOV ESI,ECX
+  SAR ESI,31
+  ADD ECX,ESI
+  INC EDX
+  XCHG ECX,EDX
+  SHL EAX,16
+  SHL EDX,16
+  OR EAX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  MOV il,EDX
+  SAR EDX,1
+  ADD EAX,EDX
+
+  MOV EDX,pat
+  MOV ESI,f
+
+@linB16_loop1a:
+  PUSH EAX
+  PUSH EBX
+  PUSH ECX
+
+  SHR EAX,16
+
+  CMP EAX,vx1
+  JL @linB16_nopixa
+  CMP EBX,vy1
+  JL @linB16_nopixa
+  CMP EAX,vx2
+  JG @linB16_nopixa
+  CMP EBX,vy2
+  JG @linB16_nopixa
+
+  TEST EDX,80000000h
+  JZ @linB16_nopixa
+  PUSH EDX
+  LEA EDI,[EAX*2]
+  PUSH EBX
+  CALL lineofsB
+  XOR [EAX+EDI],SI
+  POP EDX
+@linB16_nopixa:
+  SHL EDX,1
+  TEST EDX,7FFFFFFFh
+  JNZ @linB16_norealoada
+  MOV EDX,pat
+@linB16_norealoada:
+
+  POP ECX
+  POP EBX
+  POP EAX
+
+  ADD EAX,il
+  INC EBX
+
+  DEC ECX
+  JNZ @linB16_loop1a
+  JMP @linB16_ende
+{----------}
+@linB16_xcnt:
+
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EAX,ECX
+  JL @linB16_w3b
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB16_w3b:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  INC ECX
+  MOV ESI,EDX
+  SAR ESI,31
+  ADD EDX,ESI
+  SHL EBX,16
+  SHL EDX,16
+  OR EBX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  MOV il,EDX
+  SAR EDX,1
+  ADD EBX,EDX
+
+  MOV EDX,pat
+  MOV ESI,f
+
+@linB16_loop1b:
+
+  PUSH EBX
+  PUSH EAX
+  PUSH ECX
+
+  SHR EBX,16
+
+  CMP EAX,vx1
+  JL @linB16_nopixb
+  CMP EBX,vy1
+  JL @linB16_nopixb
+  CMP EAX,vx2
+  JG @linB16_nopixb
+  CMP EBX,vy2
+  JG @linB16_nopixb
+
+  TEST EDX,80000000h
+  JZ @linB16_nopixb
+  PUSH EDX
+  LEA EDI,[EAX*2]
+  PUSH EBX
+  CALL lineofsB
+  XOR [EAX+EDI],SI
+  POP EDX
+@linB16_nopixb:
+  SHL EDX,1
+  TEST EDX,7FFFFFFFh
+  JNZ @linB16_norealoadb
+  MOV EDX,pat
+@linB16_norealoadb:
+
+  POP ECX
+  POP EAX
+  POP EBX
+
+  ADD EBX,il
+  INC EAX
+
+  DEC ECX
+  JNZ @linB16_loop1b
+@linB16_ende:
+END;
+
+PROCEDURE linepatternXORB24(x1,y1,x2,y2,f,pat,bits:longint);assembler;
+VAR il:dword;
+ASM
+  MOV EBX,bits
+  AND EBX,1Fh
+  MOV EAX,pat
+  SHL EAX,1
+  OR EAX,1
+  MOV ECX,31
+  SUB ECX,EBX
+  SHL EAX,CL
+  MOV pat,EAX
+
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV ECX,x2
+  MOV EDX,y2
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+
+  OR ECX,ECX
+  JNS @linB24_w1
+  NEG ECX
+@linB24_w1:
+
+  OR EDX,EDX
+  JNS @linB24_w2
+  NEG EDX
+@linB24_w2:
+
+  CMP ECX,EDX
+  JG @linB24_xcnt
+{----------}
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EBX,EDX
+  JL @linB24_w3a
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB24_w3a:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  MOV ESI,ECX
+  SAR ESI,31
+  ADD ECX,ESI
+  INC EDX
+  XCHG ECX,EDX
+  SHL EAX,16
+  SHL EDX,16
+  OR EAX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  MOV il,EDX
+  SAR EDX,1
+  ADD EAX,EDX
+
+  MOV EDX,pat
+  MOV ESI,f
+
+@linB24_loop1a:
+  PUSH EAX
+  PUSH EBX
+  PUSH ECX
+
+  SHR EAX,16
+
+  CMP EAX,vx1
+  JL @linB24_nopixa
+  CMP EBX,vy1
+  JL @linB24_nopixa
+  CMP EAX,vx2
+  JG @linB24_nopixa
+  CMP EBX,vy2
+  JG @linB24_nopixa
+
+  TEST EDX,80000000h
+  JZ @linB24_nopixa
+  PUSH EDX
+  LEA EDI,[EAX*2+EAX]
+  PUSH EBX
+  CALL lineofsB
+  MOV EDX,ESI
+  SHR ESI,8
+  XOR [EAX+EDI],DL
+  XOR [EAX+EDI+1],SI
+  POP EDX
+@linB24_nopixa:
+  SHL EDX,1
+  TEST EDX,7FFFFFFFh
+  JNZ @linB24_norealoada
+  MOV EDX,pat
+@linB24_norealoada:
+
+  POP ECX
+  POP EBX
+  POP EAX
+
+  ADD EAX,il
+  INC EBX
+
+  DEC ECX
+  JNZ @linB24_loop1a
+  JMP @linB24_ende
+{----------}
+@linB24_xcnt:
+
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EAX,ECX
+  JL @linB24_w3b
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB24_w3b:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  INC ECX
+  MOV ESI,EDX
+  SAR ESI,31
+  ADD EDX,ESI
+  SHL EBX,16
+  SHL EDX,16
+  OR EBX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  MOV il,EDX
+  SAR EDX,1
+  ADD EBX,EDX
+
+  MOV EDX,pat
+  MOV ESI,f
+
+@linB24_loop1b:
+
+  PUSH EBX
+  PUSH EAX
+  PUSH ECX
+
+  SHR EBX,16
+
+  CMP EAX,vx1
+  JL @linB24_nopixb
+  CMP EBX,vy1
+  JL @linB24_nopixb
+  CMP EAX,vx2
+  JG @linB24_nopixb
+  CMP EBX,vy2
+  JG @linB24_nopixb
+
+  TEST EDX,80000000h
+  JZ @linB24_nopixb
+  PUSH EDX
+  LEA EDI,[EAX*2+EAX]
+  PUSH EBX
+  CALL lineofsB
+  MOV EDX,ESI
+  SHR ESI,8
+  XOR [EAX+EDI],DL
+  XOR [EAX+EDI+1],SI
+  POP EDX
+@linB24_nopixb:
+  SHL EDX,1
+  TEST EDX,7FFFFFFFh
+  JNZ @linB24_norealoadb
+  MOV EDX,pat
+@linB24_norealoadb:
+
+  POP ECX
+  POP EAX
+  POP EBX
+
+  ADD EBX,il
+  INC EAX
+
+  DEC ECX
+  JNZ @linB24_loop1b
+@linB24_ende:
+END;
+
+PROCEDURE linepatternXORB32(x1,y1,x2,y2,f,pat,bits:longint);assembler;
+VAR il:dword;
+ASM
+  MOV EBX,bits
+  AND EBX,1Fh
+  MOV EAX,pat
+  SHL EAX,1
+  OR EAX,1
+  MOV ECX,31
+  SUB ECX,EBX
+  SHL EAX,CL
+  MOV pat,EAX
+
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV ECX,x2
+  MOV EDX,y2
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+
+  OR ECX,ECX
+  JNS @linB32_w1
+  NEG ECX
+@linB32_w1:
+
+  OR EDX,EDX
+  JNS @linB32_w2
+  NEG EDX
+@linB32_w2:
+
+  CMP ECX,EDX
+  JG @linB32_xcnt
+{----------}
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EBX,EDX
+  JL @linB32_w3a
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB32_w3a:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  MOV ESI,ECX
+  SAR ESI,31
+  ADD ECX,ESI
+  INC EDX
+  XCHG ECX,EDX
+  SHL EAX,16
+  SHL EDX,16
+  OR EAX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  MOV il,EDX
+  SAR EDX,1
+  ADD EAX,EDX
+
+  MOV EDX,pat
+  MOV ESI,f
+
+@linB32_loop1a:
+  PUSH EAX
+  PUSH EBX
+  PUSH ECX
+
+  SHR EAX,16
+
+  CMP EAX,vx1
+  JL @linB32_nopixa
+  CMP EBX,vy1
+  JL @linB32_nopixa
+  CMP EAX,vx2
+  JG @linB32_nopixa
+  CMP EBX,vy2
+  JG @linB32_nopixa
+
+  TEST EDX,80000000h
+  JZ @linB32_nopixa
+  PUSH EDX
+  LEA EDI,[EAX*4]
+  PUSH EBX
+  CALL lineofsB
+  XOR [EAX+EDI],ESI
+  POP EDX
+@linB32_nopixa:
+  SHL EDX,1
+  TEST EDX,7FFFFFFFh
+  JNZ @linB32_norealoada
+  MOV EDX,pat
+@linB32_norealoada:
+
+  POP ECX
+  POP EBX
+  POP EAX
+
+  ADD EAX,il
+  INC EBX
+
+  DEC ECX
+  JNZ @linB32_loop1a
+  JMP @linB32_ende
+{----------}
+@linB32_xcnt:
+
+  MOV ECX,x2
+  MOV EDX,y2
+
+  CMP EAX,ECX
+  JL @linB32_w3b
+  XCHG EAX,ECX
+  XCHG EBX,EDX
+@linB32_w3b:
+
+  SUB ECX,EAX
+  SUB EDX,EBX
+  INC ECX
+  MOV ESI,EDX
+  SAR ESI,31
+  ADD EDX,ESI
+  SHL EBX,16
+  SHL EDX,16
+  OR EBX,00008000h
+  OR EDX,00008000h
+
+  PUSH EAX
+  MOV EAX,EDX
+  CDQ
+  IDIV ECX
+  MOV EDX,EAX
+  POP EAX
+
+  MOV il,EDX
+  SAR EDX,1
+  ADD EBX,EDX
+
+  MOV EDX,pat
+  MOV ESI,f
+
+@linB32_loop1b:
+
+  PUSH EBX
+  PUSH EAX
+  PUSH ECX
+
+  SHR EBX,16
+
+  CMP EAX,vx1
+  JL @linB32_nopixb
+  CMP EBX,vy1
+  JL @linB32_nopixb
+  CMP EAX,vx2
+  JG @linB32_nopixb
+  CMP EBX,vy2
+  JG @linB32_nopixb
+
+  TEST EDX,80000000h
+  JZ @linB32_nopixb
+  PUSH EDX
+  LEA EDI,[EAX*4]
+  PUSH EBX
+  CALL lineofsB
+  XOR [EAX+EDI],ESI
+  POP EDX
+@linB32_nopixb:
+  SHL EDX,1
+  TEST EDX,7FFFFFFFh
+  JNZ @linB32_norealoadb
+  MOV EDX,pat
+@linB32_norealoadb:
+
+  POP ECX
+  POP EAX
+  POP EBX
+
+  ADD EBX,il
+  INC EAX
+
+  DEC ECX
+  JNZ @linB32_loop1b
+@linB32_ende:
+END;
+
+{=============================== lineH ====================================}
+
+PROCEDURE lineHB8(x1,x2,y,f:longint);assembler;
+ASM
+  MOV EDI,x1
+  MOV ECX,x2
+  MOV EDX,y
+
+  CMP EDI,ECX
+  JLE @lineh8_w1
+  XCHG EDI,ECX
+@lineh8_w1:
+
+  CMP EDI,vx2
+  JG @lineh8_ende
+  CMP ECX,vx1
+  JL @lineh8_ende
+  CMP EDX,vy1
+  JL @lineh8_ende
+  CMP EDX,vy2
+  JG @lineh8_ende
+
+  CMP EDI,vx1
+  JGE @lineh8_w2
+  MOV EDI,vx1
+@lineh8_w2:
+  CMP ECX,vx2
+  JLE @lineh8_w3
+  MOV ECX,vx2
+@lineh8_w3:
+
+  SUB ECX,EDI
+  INC ECX
+
+  PUSH EDX
+  CALL lineofsB
+  ADD EDI,EAX
+
+  MOV EBX,f
+  MOV BH,BL
+  MOV AX,BX
+  SHL EAX,16
+  MOV AX,BX
+
+  MOV EBX,ECX
+  SHR ECX,2
+  AND EBX,3
+  REP STOSD
+  MOV ECX,EBX
+  REP STOSB
+@lineh8_ende:
+END;
+
+PROCEDURE lineHB16(x1,x2,y,f:longint);assembler;
+ASM
+  MOV EAX,x1
+  MOV ECX,x2
+  MOV EDX,y
+
+  CMP EAX,ECX
+  JLE @lineh16_w1
+  XCHG EAX,ECX
+@lineh16_w1:
+
+  CMP EAX,vx2
+  JG @lineh16_ende
+  CMP ECX,vx1
+  JL @lineh16_ende
+  CMP EDX,vy1
+  JL @lineh16_ende
+  CMP EDX,vy2
+  JG @lineh16_ende
+
+  CMP EAX,vx1
+  JGE @lineh16_w2
+  MOV EAX,vx1
+@lineh16_w2:
+  CMP ECX,vx2
+  JLE @lineh16_w3
+  MOV ECX,vx2
+@lineh16_w3:
+
+  SUB ECX,EAX
+  INC ECX
+  PUSH EDX
+  PUSH EAX
+  CALL pixofsB16
+  ADD EAX,VGAbase
+  MOV EDI,EAX
+
+  MOV EBX,f
+  MOV AX,BX
+  SHL EAX,16
+  MOV AX,BX
+
+  TEST EDI,0003h
+  JZ @lineh16_weiter
+  DEC ECX
+  STOSW
+@lineh16_weiter:
+
+  MOV EBX,ECX
+  SHR ECX,1
+  AND EBX,1
+  REP STOSD
+  MOV ECX,EBX
+  REP STOSW
+@lineh16_ende:
+END;
+
+PROCEDURE lineHB24(x1,x2,y,f:longint);assembler;
+ASM
+  MOV EAX,x1
+  MOV ECX,x2
+  MOV EDX,y
+
+  CMP EAX,ECX
+  JLE @lineh24_w1
+  XCHG EAX,ECX
+@lineh24_w1:
+
+  CMP EAX,vx2
+  JG @lineh24_ende
+  CMP ECX,vx1
+  JL @lineh24_ende
+  CMP EDX,vy1
+  JL @lineh24_ende
+  CMP EDX,vy2
+  JG @lineh24_ende
+
+  CMP EAX,vx1
+  JGE @lineh24_w2
+  MOV EAX,vx1
+@lineh24_w2:
+  CMP ECX,vx2
+  JLE @lineh24_w3
+  MOV ECX,vx2
+@lineh24_w3:
+
+  SUB ECX,EAX
+  INC ECX
+  PUSH EDX
+  PUSH EAX
+  CALL pixofsB24
+  ADD EAX,VGAbase
+  MOV EDI,EAX
+
+  MOV EAX,EDI
+  NOT EAX
+  INC EAX
+  AND EAX,0003h
+
+  MOV EDX,ECX
+  MOV EBX,EDX
+  SHL EDX,1
+  ADD EDX,EBX
+  SUB EDX,EAX
+
+  MOV EBX,EDX
+  SHR EDX,2
+
+  MOV BH,AL
+  AND EBX,0303h
+
+  MOV EAX,f
+  SHL EAX,8
+
+  XOR ECX,ECX
+  MOV CL,BH
+  JECXZ @lineh24_weiter1
+@lineh24_loop1a:
+  MOV AL,AH
+  ROR EAX,8
+  STOSB
+  DEC ECX
+  JNZ @lineh24_loop1a
+@lineh24_weiter1:
+
+  MOV ECX,EDX
+  JECXZ @lineh24_weiter2
+@lineh24_loop1b:
+  MOV AL,AH
+  ROR EAX,8
+  STOSD
+  DEC ECX
+  JNZ @lineh24_loop1b
+@lineh24_weiter2:
+
+  MOV CL,BL
+  JECXZ @lineh24_weiter3
+@lineh24_loop1c:
+  SHR EAX,8
+  STOSB
+  DEC ECX
+  JNZ @lineh24_loop1c
+@lineh24_weiter3:
+@lineh24_ende:
+END;
+
+PROCEDURE lineHB32(x1,x2,y,f:longint);assembler;
+ASM
+  MOV EAX,x1
+  MOV ECX,x2
+  MOV EDX,y
+
+  CMP EAX,ECX
+  JLE @lineh32_w1
+  XCHG EAX,ECX
+@lineh32_w1:
+
+  CMP EAX,vx2
+  JG @lineh32_ende
+  CMP ECX,vx1
+  JL @lineh32_ende
+  CMP EDX,vy1
+  JL @lineh32_ende
+  CMP EDX,vy2
+  JG @lineh32_ende
+
+  CMP EAX,vx1
+  JGE @lineh32_w2
+  MOV EAX,vx1
+@lineh32_w2:
+  CMP ECX,vx2
+  JLE @lineh32_w3
+  MOV ECX,vx2
+@lineh32_w3:
+
+  SUB ECX,EAX
+  INC ECX
+  PUSH EDX
+  PUSH EAX
+  CALL pixofsB32
+  ADD EAX,VGAbase
+  MOV EDI,EAX
+  MOV EAX,f
+  REP STOSD
+@lineh32_ende:
+END;
+
+{=============================== lineH_pattern ============================}
+
+PROCEDURE lineh_patternB8(x1,x2,y,f:longint);assembler;
+ASM
+  MOV EDI,x1
+  MOV EBX,x2
+  MOV EDX,y
+
+  CMP EDI,EBX
+  JLE @lineh8p_w1
+  XCHG EDI,EBX
+@lineh8p_w1:
+
+  CMP EDI,vx2
+  JG @lineh8p_ende
+  CMP EBX,vx1
+  JL @lineh8p_ende
+  CMP EDX,vy1
+  JL @lineh8p_ende
+  CMP EDX,vy2
+  JG @lineh8p_ende
+
+  CMP EDI,vx1
+  JGE @lineh8p_w2
+  MOV EDI,vx1
+@lineh8p_w2:
+  CMP EBX,vx2
+  JLE @lineh8p_w3
+  MOV EBX,vx2
+@lineh8p_w3:
+
+  SUB EBX,EDI
+  INC EBX
+
+  MOV ECX,EDI
+  AND ECX,7
+  MOV CH,DL
+  INC CL
+  AND ECX,0707h
+
+  PUSH EDX
+  CALL lineofsB
+  ADD EDI,EAX
+
+  MOVZX EAX,CH
+  ADD EAX,curpattern
+  MOV DL,[EAX]
+  ROR DL,CL
+
+  MOV EAX,f
+  MOV ECX,EBX
+@lh8p_loop1:
+  TEST DL,80h
+  JZ @lh8p_nopix
+  MOV [EDI],AL
+@lh8p_nopix:
+  INC EDI
+  ROR DL,1
+  DEC ECX
+  JNZ @lh8p_loop1
+@lineh8p_ende:
+END;
+
+PROCEDURE lineh_patternB16(x1,x2,y,f:longint);assembler;
+ASM
+  MOV EDI,x1
+  MOV EBX,x2
+  MOV EDX,y
+
+  CMP EDI,EBX
+  JLE @lineh16p_w1
+  XCHG EDI,EBX
+@lineh16p_w1:
+
+  CMP EDI,vx2
+  JG @lineh16p_ende
+  CMP EBX,vx1
+  JL @lineh16p_ende
+  CMP EDX,vy1
+  JL @lineh16p_ende
+  CMP EDX,vy2
+  JG @lineh16p_ende
+
+  CMP EDI,vx1
+  JGE @lineh16p_w2
+  MOV EDI,vx1
+@lineh16p_w2:
+  CMP EBX,vx2
+  JLE @lineh16p_w3
+  MOV EBX,vx2
+@lineh16p_w3:
+
+  SUB EBX,EDI
+  INC EBX
+
+  MOV ECX,EDI
+  AND ECX,7
+  MOV CH,DL
+  INC CL
+  AND ECX,0707h
+
+  PUSH EDX
+  CALL lineofsB
+  SHL EDI,1
+  ADD EDI,EAX
+
+  MOVZX EAX,CH
+  ADD EAX,curpattern
+  MOV DL,[EAX]
+  ROR DL,CL
+
+  MOV EAX,f
+  MOV ECX,EBX
+@lh16p_loop1:
+  TEST DL,80h
+  JZ @lh16p_nopix
+  MOV [EDI],AX
+@lh16p_nopix:
+  ADD EDI,2
+  ROR DL,1
+  DEC ECX
+  JNZ @lh16p_loop1
+@lineh16p_ende:
+END;
+
+PROCEDURE lineh_patternB24(x1,x2,y,f:longint);assembler;
+ASM
+  MOV EDI,x1
+  MOV EBX,x2
+  MOV EDX,y
+
+  CMP EDI,EBX
+  JLE @lineh24p_w1
+  XCHG EDI,EBX
+@lineh24p_w1:
+
+  CMP EDI,vx2
+  JG @lineh24p_ende
+  CMP EBX,vx1
+  JL @lineh24p_ende
+  CMP EDX,vy1
+  JL @lineh24p_ende
+  CMP EDX,vy2
+  JG @lineh24p_ende
+
+  CMP EDI,vx1
+  JGE @lineh24p_w2
+  MOV EDI,vx1
+@lineh24p_w2:
+  CMP EBX,vx2
+  JLE @lineh24p_w3
+  MOV EBX,vx2
+@lineh24p_w3:
+
+  SUB EBX,EDI
+  INC EBX
+
+  MOV ECX,EDI
+  AND ECX,7
+  MOV CH,DL
+  INC CL
+  AND ECX,0707h
+
+  PUSH EDX
+  CALL lineofsB
+  LEA EDI,[EDI+EDI*2]
+  ADD EDI,EAX
+
+  MOVZX EAX,CH
+  ADD EAX,curpattern
+  MOV DL,[EAX]
+  ROR DL,CL
+
+  MOV EAX,f
+  MOV ECX,EBX
+@lh24p_loop1:
+  TEST DL,80h
+  JZ @lh24p_nopix
+  MOV [EDI],AX
+  ROR EAX,16
+  MOV [EDI+2],AL
+  ROR EAX,16
+@lh24p_nopix:
+  ADD EDI,3
+  ROR DL,1
+  DEC ECX
+  JNZ @lh24p_loop1
+@lineh24p_ende:
+END;
+
+PROCEDURE lineh_patternB32(x1,x2,y,f:longint);assembler;
+ASM
+  MOV EDI,x1
+  MOV EBX,x2
+  MOV EDX,y
+
+  CMP EDI,EBX
+  JLE @lineh32p_w1
+  XCHG EDI,EBX
+@lineh32p_w1:
+
+  CMP EDI,vx2
+  JG @lineh32p_ende
+  CMP EBX,vx1
+  JL @lineh32p_ende
+  CMP EDX,vy1
+  JL @lineh32p_ende
+  CMP EDX,vy2
+  JG @lineh32p_ende
+
+  CMP EDI,vx1
+  JGE @lineh32p_w2
+  MOV EDI,vx1
+@lineh32p_w2:
+  CMP EBX,vx2
+  JLE @lineh32p_w3
+  MOV EBX,vx2
+@lineh32p_w3:
+
+  SUB EBX,EDI
+  INC EBX
+
+  MOV ECX,EDI
+  AND ECX,7
+  MOV CH,DL
+  INC CL
+  AND ECX,0707h
+
+  PUSH EDX
+  CALL lineofsB
+  SHL EDI,2
+  ADD EDI,EAX
+
+  MOVZX EAX,CH
+  ADD EAX,curpattern
+  MOV DL,[EAX]
+  ROR DL,CL
+
+  MOV EAX,f
+  MOV ECX,EBX
+@lh32p_loop1:
+  TEST DL,80h
+  JZ @lh32p_nopix
+  MOV [EDI],EAX
+@lh32p_nopix:
+  ADD EDI,4
+  ROR DL,1
+  DEC ECX
+  JNZ @lh32p_loop1
+@lineh32p_ende:
+END;
+
+{================================ lineV =====================================}
+
+PROCEDURE lineVB8(x,y1,y2,f:longint);assembler;
+ASM
+  MOV EAX,x
+  MOV EBX,y1
+  MOV ECX,y2
+
+  CMP EBX,ECX
+  JLE @lineV8_w2
+  XCHG EBX,ECX
+@lineV8_w2:
+
+  CMP EAX,vx1
+  JL @lineV8_ende
+  CMP EAX,vx2
+  JG @lineV8_ende
+  CMP EBX,vy2
+  JG @lineV8_ende
+  CMP ECX,vy1
+  JL @lineV8_ende
+
+  CMP EBX,vy1
+  JGE @lineV8_w4
+  MOV EBX,vy1
+@lineV8_w4:
+  CMP ECX,vy2
+  JLE @lineV8_w6
+  MOV ECX,vy2
+@lineV8_w6:
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB8
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EAX,f
+  MOV ESI,bytperline
+  MOV EBX,VGAbase
+
+@lineV8_loop:
+  MOV [EDI+EBX],AL
+  ADD DI,SI
+  JC @lineV8_bankswitch
+  DEC ECX
+  JNZ @lineV8_loop
+  JMP @lineV8_ende
+@lineV8_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @lineV8_loop
+@lineV8_ende:
+END;
+
+PROCEDURE lineVB16(x,y1,y2,f:longint);assembler;
+ASM
+  MOV EAX,x
+  MOV EBX,y1
+  MOV ECX,y2
+
+  CMP EBX,ECX
+  JLE @lineV16_w2
+  XCHG EBX,ECX
+@lineV16_w2:
+
+  CMP EAX,vx1
+  JL @lineV16_ende
+  CMP EAX,vx2
+  JG @lineV16_ende
+  CMP EBX,vy2
+  JG @lineV16_ende
+  CMP ECX,vy1
+  JL @lineV16_ende
+
+  CMP EBX,vy1
+  JGE @lineV16_w4
+  MOV EBX,vy1
+@lineV16_w4:
+  CMP ECX,vy2
+  JLE @lineV16_w6
+  MOV ECX,vy2
+@lineV16_w6:
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB16
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EAX,f
+  MOV ESI,bytperline
+  MOV EBX,VGAbase
+
+@lineV16_loop:
+  MOV [EDI+EBX],AX
+  ADD DI,SI
+  JC @lineV16_bankswitch
+  DEC ECX
+  JNZ @lineV16_loop
+  JMP @lineV16_ende
+@lineV16_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @lineV16_loop
+@lineV16_ende:
+END;
+
+PROCEDURE lineVB24(x,y1,y2,f:longint);assembler;
+ASM
+  MOV EAX,x
+  MOV EBX,y1
+  MOV ECX,y2
+
+  CMP EBX,ECX
+  JLE @lineV24_w2
+  XCHG EBX,ECX
+@lineV24_w2:
+
+  CMP EAX,vx1
+  JL @lineV24_ende
+  CMP EAX,vx2
+  JG @lineV24_ende
+  CMP EBX,vy2
+  JG @lineV24_ende
+  CMP ECX,vy1
+  JL @lineV24_ende
+
+  CMP EBX,vy1
+  JGE @lineV24_w4
+  MOV EBX,vy1
+@lineV24_w4:
+  CMP ECX,vy2
+  JLE @lineV24_w6
+  MOV ECX,vy2
+@lineV24_w6:
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB24
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EAX,f
+  MOV EDX,EAX
+  SHR EDX,16
+  MOV ESI,bytperline
+  MOV EBX,VGAbase
+
+@lineV24_loop:
+  MOV [EDI+EBX],AX
+  MOV [EDI+EBX+2],DL
+  ADD DI,SI
+  JC @lineV24_bankswitch
+  DEC ECX
+  JNZ @lineV24_loop
+  JMP @lineV24_ende
+@lineV24_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @lineV24_loop
+@lineV24_ende:
+END;
+
+PROCEDURE lineVB32(x,y1,y2,f:longint);assembler;
+ASM
+  MOV EAX,x
+  MOV EBX,y1
+  MOV ECX,y2
+
+  CMP EBX,ECX
+  JLE @lineV32_w2
+  XCHG EBX,ECX
+@lineV32_w2:
+
+  CMP EAX,vx1
+  JL @lineV32_ende
+  CMP EAX,vx2
+  JG @lineV32_ende
+  CMP EBX,vy2
+  JG @lineV32_ende
+  CMP ECX,vy1
+  JL @lineV32_ende
+
+  CMP EBX,vy1
+  JGE @lineV32_w4
+  MOV EBX,vy1
+@lineV32_w4:
+  CMP ECX,vy2
+  JLE @lineV32_w6
+  MOV ECX,vy2
+@lineV32_w6:
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB32
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EAX,f
+  MOV ESI,bytperline
+  MOV EBX,VGAbase
+
+@lineV32_loop:
+  MOV [EDI+EBX],EAX
+  ADD DI,SI
+  JC @lineV32_bankswitch
+  DEC ECX
+  JNZ @lineV32_loop
+  JMP @lineV32_ende
+@lineV32_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @lineV32_loop
+@lineV32_ende:
+END;
+
+{================================ lineV_pattern ==============================}
+
+PROCEDURE lineV_patternB8(x,y1,y2,f:longint);assembler;
+VAR patpos:longint;
+    patrot:byte;
+ASM
+  MOV EAX,x
+  MOV EBX,y1
+  MOV ECX,y2
+
+  CMP EBX,ECX
+  JLE @lineV8p_w2
+  XCHG EBX,ECX
+@lineV8p_w2:
+
+  CMP EAX,vx1
+  JL @lineV8p_ende
+  CMP EAX,vx2
+  JG @lineV8p_ende
+  CMP EBX,vy2
+  JG @lineV8p_ende
+  CMP ECX,vy1
+  JL @lineV8p_ende
+
+  CMP EBX,vy1
+  JGE @lineV8p_w4
+  MOV EBX,vy1
+@lineV8p_w4:
+  CMP ECX,vy2
+  JLE @lineV8p_w6
+  MOV ECX,vy2
+@lineV8p_w6:
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+
+  MOV EDX,EAX
+  INC EDX
+  AND EDX,7
+  MOV patrot,DL
+  MOV EDX,EBX
+  AND EDX,7
+  MOV patpos,EDX
+
+  CALL pixofsB8
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+
+  SUB ECX,EBX
+  INC ECX
+
+  PUSH ECX
+  MOV CL,patrot
+  MOV EDX,curpattern
+  MOV BX,8000h
+@lineV8p_pat:
+  MOV AL,[EDX]
+  AND CL,7
+  ROR AL,CL
+  INC CL
+  AND AL,BH
+  OR BL,AL
+  INC EDX
+  SHR BH,1
+  JNZ @lineV8p_pat
+  MOV CL,BYTE PTR patpos
+  ROL BL,CL
+  POP ECX
+
+  MOV EAX,f
+  MOV ESI,bytperline
+  MOV EDX,VGAbase
+
+@lineV8p_loop:
+  PUSH EDI
+  TEST BL,80h
+  JZ @lineV8p_nopix
+  MOV [EDI+EDX],AL
+@lineV8p_nopix:
+  ROL BL,1
+  ADD DI,SI
+  JC @lineV8p_bankswitch
+  DEC ECX
+  JNZ @lineV8p_loop
+  JMP @lineV8p_ende
+@lineV8p_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @lineV8p_loop
+@lineV8p_ende:
+END;
+
+PROCEDURE lineV_patternB16(x,y1,y2,f:longint);assembler;
+VAR patpos:longint;
+    patrot:byte;
+ASM
+  MOV EAX,x
+  MOV EBX,y1
+  MOV ECX,y2
+
+  CMP EBX,ECX
+  JLE @lineV16p_w2
+  XCHG EBX,ECX
+@lineV16p_w2:
+
+  CMP EAX,vx1
+  JL @lineV16p_ende
+  CMP EAX,vx2
+  JG @lineV16p_ende
+  CMP EBX,vy2
+  JG @lineV16p_ende
+  CMP ECX,vy1
+  JL @lineV16p_ende
+
+  CMP EBX,vy1
+  JGE @lineV16p_w4
+  MOV EBX,vy1
+@lineV16p_w4:
+  CMP ECX,vy2
+  JLE @lineV16p_w6
+  MOV ECX,vy2
+@lineV16p_w6:
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+
+  MOV EDX,EAX
+  INC EDX
+  AND EDX,7
+  MOV patrot,DL
+  MOV EDX,EBX
+  AND EDX,7
+  MOV patpos,EDX
+
+  CALL pixofsB16
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+
+  SUB ECX,EBX
+  INC ECX
+
+  PUSH ECX
+  MOV CL,patrot
+  MOV EDX,curpattern
+  MOV BX,8000h
+@lineV16p_pat:
+  MOV AL,[EDX]
+  AND CL,7
+  ROR AL,CL
+  INC CL
+  AND AL,BH
+  OR BL,AL
+  INC EDX
+  SHR BH,1
+  JNZ @lineV16p_pat
+  MOV CL,BYTE PTR patpos
+  ROL BL,CL
+  POP ECX
+
+  MOV EAX,f
+  MOV ESI,bytperline
+  MOV EDX,VGAbase
+
+@lineV16p_loop:
+  PUSH EDI
+  TEST BL,80h
+  JZ @lineV16p_nopix
+  MOV [EDI+EDX],AX
+@lineV16p_nopix:
+  ROL BL,1
+  ADD DI,SI
+  JC @lineV16p_bankswitch
+  DEC ECX
+  JNZ @lineV16p_loop
+  JMP @lineV16p_ende
+@lineV16p_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @lineV16p_loop
+@lineV16p_ende:
+END;
+
+PROCEDURE lineV_patternB24(x,y1,y2,f:longint);assembler;
+VAR patpos:longint;
+    patrot:byte;
+ASM
+  MOV EAX,x
+  MOV EBX,y1
+  MOV ECX,y2
+
+  CMP EBX,ECX
+  JLE @lineV24p_w2
+  XCHG EBX,ECX
+@lineV24p_w2:
+
+  CMP EAX,vx1
+  JL @lineV24p_ende
+  CMP EAX,vx2
+  JG @lineV24p_ende
+  CMP EBX,vy2
+  JG @lineV24p_ende
+  CMP ECX,vy1
+  JL @lineV24p_ende
+
+  CMP EBX,vy1
+  JGE @lineV24p_w4
+  MOV EBX,vy1
+@lineV24p_w4:
+  CMP ECX,vy2
+  JLE @lineV24p_w6
+  MOV ECX,vy2
+@lineV24p_w6:
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+
+  MOV EDX,EAX
+  INC EDX
+  AND EDX,7
+  MOV patrot,DL
+  MOV EDX,EBX
+  AND EDX,7
+  MOV patpos,EDX
+
+  CALL pixofsB24
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+
+  SUB ECX,EBX
+  INC ECX
+
+  PUSH ECX
+  MOV CL,patrot
+  MOV EDX,curpattern
+  MOV BX,8000h
+@lineV24p_pat:
+  MOV AL,[EDX]
+  AND CL,7
+  ROR AL,CL
+  INC CL
+  AND AL,BH
+  OR BL,AL
+  INC EDX
+  SHR BH,1
+  JNZ @lineV24p_pat
+  MOV CL,BYTE PTR patpos
+  ROL BL,CL
+  POP ECX
+
+  MOV EAX,f
+  MOV ESI,bytperline
+  MOV EDX,VGAbase
+
+@lineV24p_loop:
+  PUSH EDI
+  TEST BL,80h
+  JZ @lineV24p_nopix
+  MOV [EDI+EDX],AX
+  ROR EAX,16
+  MOV [EDI+EDX+2],AL
+  ROR EAX,16
+@lineV24p_nopix:
+  ROL BL,1
+  ADD DI,SI
+  JC @lineV24p_bankswitch
+  DEC ECX
+  JNZ @lineV24p_loop
+  JMP @lineV24p_ende
+@lineV24p_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @lineV24p_loop
+@lineV24p_ende:
+END;
+
+PROCEDURE lineV_patternB32(x,y1,y2,f:longint);assembler;
+VAR patpos:longint;
+    patrot:byte;
+ASM
+  MOV EAX,x
+  MOV EBX,y1
+  MOV ECX,y2
+
+  CMP EBX,ECX
+  JLE @lineV32p_w2
+  XCHG EBX,ECX
+@lineV32p_w2:
+
+  CMP EAX,vx1
+  JL @lineV32p_ende
+  CMP EAX,vx2
+  JG @lineV32p_ende
+  CMP EBX,vy2
+  JG @lineV32p_ende
+  CMP ECX,vy1
+  JL @lineV32p_ende
+
+  CMP EBX,vy1
+  JGE @lineV32p_w4
+  MOV EBX,vy1
+@lineV32p_w4:
+  CMP ECX,vy2
+  JLE @lineV32p_w6
+  MOV ECX,vy2
+@lineV32p_w6:
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+
+  MOV EDX,EAX
+  INC EDX
+  AND EDX,7
+  MOV patrot,DL
+  MOV EDX,EBX
+  AND EDX,7
+  MOV patpos,EDX
+
+  CALL pixofsB32
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+
+  SUB ECX,EBX
+  INC ECX
+
+  PUSH ECX
+  MOV CL,patrot
+  MOV EDX,curpattern
+  MOV BX,8000h
+@lineV32p_pat:
+  MOV AL,[EDX]
+  AND CL,7
+  ROR AL,CL
+  INC CL
+  AND AL,BH
+  OR BL,AL
+  INC EDX
+  SHR BH,1
+  JNZ @lineV32p_pat
+  MOV CL,BYTE PTR patpos
+  ROL BL,CL
+  POP ECX
+
+  MOV EAX,f
+  MOV ESI,bytperline
+  MOV EDX,VGAbase
+
+@lineV32p_loop:
+  PUSH EDI
+  TEST BL,80h
+  JZ @lineV32p_nopix
+  MOV [EDI+EDX],EAX
+@lineV32p_nopix:
+  ROL BL,1
+  ADD DI,SI
+  JC @lineV32p_bankswitch
+  DEC ECX
+  JNZ @lineV32p_loop
+  JMP @lineV32p_ende
+@lineV32p_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @lineV32p_loop
+@lineV32p_ende:
+END;
+
+{================================ bar =====================================}
+
+PROCEDURE barB8(x1,y1,x2,y2,f:longint);assembler;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+
+  CMP EAX,EDX
+  JLE @bar8_w1
+  XCHG EAX,EDX
+@bar8_w1:
+  CMP EBX,ECX
+  JLE @bar8_w2
+  XCHG EBX,ECX
+@bar8_w2:
+  CMP EAX,vx2
+  JG @bar8_ende
+  CMP EBX,vy2
+  JG @bar8_ende
+  CMP EDX,vx1
+  JL @bar8_ende
+  CMP ECX,vy1
+  JL @bar8_ende
+
+  CMP EAX,vx1
+  JGE @bar8_w3
+  MOV EAX,vx1
+@bar8_w3:
+  CMP EBX,vy1
+  JGE @bar8_w4
+  MOV EBX,vy1
+@bar8_w4:
+  CMP EDX,vx2
+  JLE @bar8_w5
+  MOV EDX,vx2
+@bar8_w5:
+  CMP ECX,vy2
+  JLE @bar8_w6
+  MOV ECX,vy2
+@bar8_w6:
+
+  SUB EDX,EAX
+  INC EDX
+  CLD
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB8
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EBX,f
+  MOV BH,BL
+  MOV AX,BX
+  SHL EAX,16
+  MOV AX,BX
+
+  MOV ESI,bytperline
+
+  TEST EDI,0001h
+  JNZ @bar8b_weiter
+
+  MOV EBX,EDX
+  SHR EBX,1
+  AND EDX,1
+@bar8a_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV ECX,EBX
+  REP STOSW
+  MOV ECX,EDX
+  REP STOSB
+  POP EDI
+  POP ECX
+  ADD DI,SI
+  JC @bar8a_bankswitch
+  DEC ECX
+  JNZ @bar8a_loop
+  JMP @bar8_ende
+@bar8a_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @bar8a_loop
+  JMP @bar8_ende
+
+@bar8b_weiter:
+  DEC EDX
+  MOV EBX,EDX
+  SHR EBX,1
+  AND EDX,1
+@bar8b_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  STOSB
+  MOV ECX,EBX
+  REP STOSW
+  MOV ECX,EDX
+  REP STOSB
+  POP EDI
+  POP ECX
+  ADD DI,SI
+  JC @bar8b_bankswitch
+  DEC ECX
+  JNZ @bar8b_loop
+  JMP @bar8_ende
+
+@bar8b_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @bar8b_loop
+@bar8_ende:
+END;
+
+PROCEDURE barB16(x1,y1,x2,y2,f:longint);assembler;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+
+  CMP EAX,EDX
+  JLE @bar16_w1
+  XCHG EAX,EDX
+@bar16_w1:
+  CMP EBX,ECX
+  JLE @bar16_w2
+  XCHG EBX,ECX
+@bar16_w2:
+  CMP EAX,vx2
+  JG @bar16_ende
+  CMP EBX,vy2
+  JG @bar16_ende
+  CMP EDX,vx1
+  JL @bar16_ende
+  CMP ECX,vy1
+  JL @bar16_ende
+
+  CMP EAX,vx1
+  JGE @bar16_w3
+  MOV EAX,vx1
+@bar16_w3:
+  CMP EBX,vy1
+  JGE @bar16_w4
+  MOV EBX,vy1
+@bar16_w4:
+  CMP EDX,vx2
+  JLE @bar16_w5
+  MOV EDX,vx2
+@bar16_w5:
+  CMP ECX,vy2
+  JLE @bar16_w6
+  MOV ECX,vy2
+@bar16_w6:
+
+  SUB EDX,EAX
+  INC EDX
+  CLD
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB16
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EBX,f
+  MOV AX,BX
+  SHL EAX,16
+  MOV AX,BX
+
+  MOV ESI,bytperline
+
+  TEST EDI,0003h
+  JNZ @bar16b_weiter
+
+  MOV EBX,EDX
+  SHR EBX,1
+  AND EDX,1
+@bar16a_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV ECX,EBX
+  REP STOSD
+  MOV ECX,EDX
+  REP STOSW
+  POP EDI
+  POP ECX
+  ADD DI,SI
+  JC @bar16a_bankswitch
+  DEC ECX
+  JNZ @bar16a_loop
+  JMP @bar16_ende
+
+@bar16a_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @bar16a_loop
+  JMP @bar16_ende
+
+@bar16b_weiter:
+  DEC EDX
+  MOV EBX,EDX
+  SHR EBX,1
+  AND EDX,1
+@bar16b_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  STOSW
+  MOV ECX,EBX
+  REP STOSD
+  MOV ECX,EDX
+  REP STOSW
+  POP EDI
+  POP ECX
+  ADD DI,SI
+  JC @bar16b_bankswitch
+  DEC ECX
+  JNZ @bar16b_loop
+  JMP @bar16_ende
+
+@bar16b_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @bar16b_loop
+@bar16_ende:
+END;
+
+PROCEDURE barB24(x1,y1,x2,y2,f:longint);assembler;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+
+  CMP EAX,EDX
+  JLE @bar24_w1
+  XCHG EAX,EDX
+@bar24_w1:
+  CMP EBX,ECX
+  JLE @bar24_w2
+  XCHG EBX,ECX
+@bar24_w2:
+  CMP EAX,vx2
+  JG @bar24_ende
+  CMP EBX,vy2
+  JG @bar24_ende
+  CMP EDX,vx1
+  JL @bar24_ende
+  CMP ECX,vy1
+  JL @bar24_ende
+
+  CMP EAX,vx1
+  JGE @bar24_w3
+  MOV EAX,vx1
+@bar24_w3:
+  CMP EBX,vy1
+  JGE @bar24_w4
+  MOV EBX,vy1
+@bar24_w4:
+  CMP EDX,vx2
+  JLE @bar24_w5
+  MOV EDX,vx2
+@bar24_w5:
+  CMP ECX,vy2
+  JLE @bar24_w6
+  MOV ECX,vy2
+@bar24_w6:
+
+  SUB EDX,EAX
+  INC EDX
+  CLD
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB24
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EAX,EDI
+  NOT EAX
+  INC EAX
+  AND EAX,0003h
+
+  MOV EBX,EDX
+  SHL EDX,1
+  ADD EDX,EBX
+  SUB EDX,EAX
+
+  MOV EBX,EDX
+  SHR EDX,2
+
+  MOV BH,AL
+  AND EBX,0303h
+
+  MOV EAX,f
+  SHL EAX,8
+
+@bar24_loop2:
+  PUSH ECX
+  PUSH EDI
+  PUSH EAX
+  ADD EDI,VGAbase
+
+  XOR ECX,ECX
+  MOV CL,BH
+  JECXZ @bar24_weiter1
+@bar24_loop1a:
+  MOV AL,AH
+  ROR EAX,8
+  STOSB
+  DEC ECX
+  JNZ @bar24_loop1a
+@bar24_weiter1:
+
+  MOV ECX,EDX
+  JECXZ @bar24_weiter2
+@bar24_loop1b:
+  MOV AL,AH
+  ROR EAX,8
+  STOSD
+  DEC ECX
+  JNZ @bar24_loop1b
+@bar24_weiter2:
+
+  MOV CL,BL
+  JECXZ @bar24_weiter3
+@bar24_loop1c:
+  SHR EAX,8
+  STOSB
+  DEC ECX
+  JNZ @bar24_loop1c
+@bar24_weiter3:
+
+  POP EAX
+  POP EDI
+  POP ECX
+
+  ADD DI,WORD PTR bytperline
+  JC @bar24_bankswitch
+  DEC ECX
+  JNZ @bar24_loop2
+  JMP @bar24_ende
+
+@bar24_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @bar24_loop2
+@bar24_ende:
+END;
+
+PROCEDURE barB32(x1,y1,x2,y2,f:longint);assembler;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+
+  CMP EAX,EDX
+  JLE @bar32_w1
+  XCHG EAX,EDX
+@bar32_w1:
+  CMP EBX,ECX
+  JLE @bar32_w2
+  XCHG EBX,ECX
+@bar32_w2:
+  CMP EAX,vx2
+  JG @bar32_ende
+  CMP EBX,vy2
+  JG @bar32_ende
+  CMP EDX,vx1
+  JL @bar32_ende
+  CMP ECX,vy1
+  JL @bar32_ende
+
+  CMP EAX,vx1
+  JGE @bar32_w3
+  MOV EAX,vx1
+@bar32_w3:
+  CMP EBX,vy1
+  JGE @bar32_w4
+  MOV EBX,vy1
+@bar32_w4:
+  CMP EDX,vx2
+  JLE @bar32_w5
+  MOV EDX,vx2
+@bar32_w5:
+  CMP ECX,vy2
+  JLE @bar32_w6
+  MOV ECX,vy2
+@bar32_w6:
+
+  SUB EDX,EAX
+  INC EDX
+  CLD
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB32
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EAX,f
+  MOV ESI,bytperline
+  MOV EBX,EDI
+@bar32_loop:
+  PUSH ECX
+  MOV EDI,EBX
+  ADD EDI,VGAbase
+  MOV ECX,EDX
+  REP STOSD
+  POP ECX
+
+  ADD BX,SI
+  JC @bar32_weiter
+  DEC ECX
+  JNZ @bar32_loop
+  JMP @bar32_ende
+
+@bar32_weiter:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @bar32_loop
+@bar32_ende:
+END;
+
+{================================ bar_pattern ==============================}
+
+PROCEDURE bar_patternB8(x1,y1,x2,y2,f:longint);assembler;
+VAR patpos:longint;
+    patrot:byte;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+
+  CMP EAX,EDX
+  JLE @bar8p_w1
+  XCHG EAX,EDX
+@bar8p_w1:
+  CMP EBX,ECX
+  JLE @bar8p_w2
+  XCHG EBX,ECX
+@bar8p_w2:
+  CMP EAX,vx2
+  JG @bar8p_ende
+  CMP EBX,vy2
+  JG @bar8p_ende
+  CMP EDX,vx1
+  JL @bar8p_ende
+  CMP ECX,vy1
+  JL @bar8p_ende
+
+  CMP EAX,vx1
+  JGE @bar8p_w3
+  MOV EAX,vx1
+@bar8p_w3:
+  CMP EBX,vy1
+  JGE @bar8p_w4
+  MOV EBX,vy1
+@bar8p_w4:
+  CMP EDX,vx2
+  JLE @bar8p_w5
+  MOV EDX,vx2
+@bar8p_w5:
+  CMP ECX,vy2
+  JLE @bar8p_w6
+  MOV ECX,vy2
+@bar8p_w6:
+
+  SUB EDX,EAX
+  INC EDX
+  CLD
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+
+  MOV EDX,EAX
+  INC EDX
+  AND EDX,7
+  MOV patrot,DL
+  MOV EDX,EBX
+  AND EDX,7
+  MOV patpos,EDX
+
+  CALL pixofsB8
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EAX,f
+  MOV ESI,bytperline
+
+@bar8p_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV ECX,patpos
+  MOV EBX,curpattern
+  MOV BL,[ECX+EBX]
+  INC ECX
+  AND ECX,7
+  MOV patpos,ECX
+  MOV CL,patrot
+  ROR BL,CL
+  MOV ECX,EDX
+@bar8p_loop1:
+  TEST BL,80h
+  JZ @bar8p_nopix
+  MOV [EDI],AL
+@bar8p_nopix:
+  INC EDI
+  ROR BL,1
+  DEC ECX
+  JNZ @bar8p_loop1
+
+  POP EDI
+  POP ECX
+  ADD DI,SI
+  JC @bar8p_bankswitch
+  DEC ECX
+  JNZ @bar8p_loop
+  JMP @bar8p_ende
+@bar8p_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @bar8p_loop
+@bar8p_ende:
+END;
+
+PROCEDURE bar_patternB16(x1,y1,x2,y2,f:longint);assembler;
+VAR patpos:longint;
+    patrot:byte;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+
+  CMP EAX,EDX
+  JLE @bar16p_w1
+  XCHG EAX,EDX
+@bar16p_w1:
+  CMP EBX,ECX
+  JLE @bar16p_w2
+  XCHG EBX,ECX
+@bar16p_w2:
+  CMP EAX,vx2
+  JG @bar16p_ende
+  CMP EBX,vy2
+  JG @bar16p_ende
+  CMP EDX,vx1
+  JL @bar16p_ende
+  CMP ECX,vy1
+  JL @bar16p_ende
+
+  CMP EAX,vx1
+  JGE @bar16p_w3
+  MOV EAX,vx1
+@bar16p_w3:
+  CMP EBX,vy1
+  JGE @bar16p_w4
+  MOV EBX,vy1
+@bar16p_w4:
+  CMP EDX,vx2
+  JLE @bar16p_w5
+  MOV EDX,vx2
+@bar16p_w5:
+  CMP ECX,vy2
+  JLE @bar16p_w6
+  MOV ECX,vy2
+@bar16p_w6:
+
+  SUB EDX,EAX
+  INC EDX
+  CLD
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+
+  MOV EDX,EAX
+  INC EDX
+  AND EDX,7
+  MOV patrot,DL
+  MOV EDX,EBX
+  AND EDX,7
+  MOV patpos,EDX
+
+  CALL pixofsB16
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EAX,f
+  MOV ESI,bytperline
+
+@bar16p_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV ECX,patpos
+  MOV EBX,curpattern
+  MOV BL,[ECX+EBX]
+  INC ECX
+  AND ECX,7
+  MOV patpos,ECX
+  MOV CL,patrot
+  ROR BL,CL
+  MOV ECX,EDX
+@bar16p_loop1:
+  TEST BL,80h
+  JZ @bar16p_nopix
+  MOV [EDI],AX
+@bar16p_nopix:
+  ADD EDI,2
+  ROR BL,1
+  DEC ECX
+  JNZ @bar16p_loop1
+
+  POP EDI
+  POP ECX
+  ADD DI,SI
+  JC @bar16p_bankswitch
+  DEC ECX
+  JNZ @bar16p_loop
+  JMP @bar16p_ende
+@bar16p_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @bar16p_loop
+@bar16p_ende:
+END;
+
+PROCEDURE bar_patternB24(x1,y1,x2,y2,f:longint);assembler;
+VAR patpos:longint;
+    patrot:byte;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+
+  CMP EAX,EDX
+  JLE @bar24p_w1
+  XCHG EAX,EDX
+@bar24p_w1:
+  CMP EBX,ECX
+  JLE @bar24p_w2
+  XCHG EBX,ECX
+@bar24p_w2:
+  CMP EAX,vx2
+  JG @bar24p_ende
+  CMP EBX,vy2
+  JG @bar24p_ende
+  CMP EDX,vx1
+  JL @bar24p_ende
+  CMP ECX,vy1
+  JL @bar24p_ende
+
+  CMP EAX,vx1
+  JGE @bar24p_w3
+  MOV EAX,vx1
+@bar24p_w3:
+  CMP EBX,vy1
+  JGE @bar24p_w4
+  MOV EBX,vy1
+@bar24p_w4:
+  CMP EDX,vx2
+  JLE @bar24p_w5
+  MOV EDX,vx2
+@bar24p_w5:
+  CMP ECX,vy2
+  JLE @bar24p_w6
+  MOV ECX,vy2
+@bar24p_w6:
+
+  SUB EDX,EAX
+  INC EDX
+  CLD
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+
+  MOV EDX,EAX
+  INC EDX
+  AND EDX,7
+  MOV patrot,DL
+  MOV EDX,EBX
+  AND EDX,7
+  MOV patpos,EDX
+
+  CALL pixofsB24
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EAX,f
+  MOV ESI,bytperline
+
+@bar24p_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV ECX,patpos
+  MOV EBX,curpattern
+  MOV BL,[ECX+EBX]
+  INC ECX
+  AND ECX,7
+  MOV patpos,ECX
+  MOV CL,patrot
+  ROR BL,CL
+  MOV ECX,EDX
+@bar24p_loop1:
+  TEST BL,80h
+  JZ @bar24p_nopix
+  MOV [EDI],AX
+  ROR EAX,16
+  MOV [EDI+2],AL
+  ROR EAX,16
+@bar24p_nopix:
+  ADD EDI,3
+  ROR BL,1
+  DEC ECX
+  JNZ @bar24p_loop1
+
+  POP EDI
+  POP ECX
+  ADD DI,SI
+  JC @bar24p_bankswitch
+  DEC ECX
+  JNZ @bar24p_loop
+  JMP @bar24p_ende
+@bar24p_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @bar24p_loop
+@bar24p_ende:
+END;
+
+PROCEDURE bar_patternB32(x1,y1,x2,y2,f:longint);assembler;
+VAR patpos:longint;
+    patrot:byte;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+
+  CMP EAX,EDX
+  JLE @bar32p_w1
+  XCHG EAX,EDX
+@bar32p_w1:
+  CMP EBX,ECX
+  JLE @bar32p_w2
+  XCHG EBX,ECX
+@bar32p_w2:
+  CMP EAX,vx2
+  JG @bar32p_ende
+  CMP EBX,vy2
+  JG @bar32p_ende
+  CMP EDX,vx1
+  JL @bar32p_ende
+  CMP ECX,vy1
+  JL @bar32p_ende
+
+  CMP EAX,vx1
+  JGE @bar32p_w3
+  MOV EAX,vx1
+@bar32p_w3:
+  CMP EBX,vy1
+  JGE @bar32p_w4
+  MOV EBX,vy1
+@bar32p_w4:
+  CMP EDX,vx2
+  JLE @bar32p_w5
+  MOV EDX,vx2
+@bar32p_w5:
+  CMP ECX,vy2
+  JLE @bar32p_w6
+  MOV ECX,vy2
+@bar32p_w6:
+
+  SUB EDX,EAX
+  INC EDX
+  CLD
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+
+  MOV EDX,EAX
+  INC EDX
+  AND EDX,7
+  MOV patrot,DL
+  MOV EDX,EBX
+  AND EDX,7
+  MOV patpos,EDX
+
+  CALL pixofsB32
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EAX,f
+  MOV ESI,bytperline
+
+@bar32p_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV ECX,patpos
+  MOV EBX,curpattern
+  MOV BL,[ECX+EBX]
+  INC ECX
+  AND ECX,7
+  MOV patpos,ECX
+  MOV CL,patrot
+  ROR BL,CL
+  MOV ECX,EDX
+@bar32p_loop1:
+  TEST BL,80h
+  JZ @bar32p_nopix
+  MOV [EDI],EAX
+@bar32p_nopix:
+  ADD EDI,4
+  ROR BL,1
+  DEC ECX
+  JNZ @bar32p_loop1
+
+  POP EDI
+  POP ECX
+  ADD DI,SI
+  JC @bar32p_bankswitch
+  DEC ECX
+  JNZ @bar32p_loop
+  JMP @bar32p_ende
+@bar32p_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @bar32p_loop
+@bar32p_ende:
+END;
+
+{================================ @barXOR ==================================}
+
+PROCEDURE barXORB8(x1,y1,x2,y2,f:longint);assembler;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+
+  CMP EAX,EDX
+  JLE @barXOR8_w1
+  XCHG EAX,EDX
+@barXOR8_w1:
+  CMP EBX,ECX
+  JLE @barXOR8_w2
+  XCHG EBX,ECX
+@barXOR8_w2:
+  CMP EAX,vx2
+  JG @barXOR8_ende
+  CMP EBX,vy2
+  JG @barXOR8_ende
+  CMP EDX,vx1
+  JL @barXOR8_ende
+  CMP ECX,vy1
+  JL @barXOR8_ende
+
+  CMP EAX,vx1
+  JGE @barXOR8_w3
+  MOV EAX,vx1
+@barXOR8_w3:
+  CMP EBX,vy1
+  JGE @barXOR8_w4
+  MOV EBX,vy1
+@barXOR8_w4:
+  CMP EDX,vx2
+  JLE @barXOR8_w5
+  MOV EDX,vx2
+@barXOR8_w5:
+  CMP ECX,vy2
+  JLE @barXOR8_w6
+  MOV ECX,vy2
+@barXOR8_w6:
+
+  SUB EDX,EAX
+  INC EDX
+  CLD
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB8
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EAX,f
+  MOV ESI,bytperline
+
+@barXOR8_loop1:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV ECX,EDX
+@barXOR8_loop2:
+  XOR [EDI],AL
+  INC EDI
+  DEC ECX
+  JNZ @barXOR8_loop2
+  POP EDI
+  POP ECX
+  ADD DI,SI
+  JC @barXOR8_weiter
+  DEC ECX
+  JNZ @barXOR8_loop1
+  JMP @barXOR8_ende
+
+@barXOR8_weiter:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @barXOR8_loop1
+@barXOR8_ende:
+END;
+
+PROCEDURE barXORB16(x1,y1,x2,y2,f:longint);assembler;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+
+  CMP EAX,EDX
+  JLE @barXOR16_w1
+  XCHG EAX,EDX
+@barXOR16_w1:
+  CMP EBX,ECX
+  JLE @barXOR16_w2
+  XCHG EBX,ECX
+@barXOR16_w2:
+  CMP EAX,vx2
+  JG @barXOR16_ende
+  CMP EBX,vy2
+  JG @barXOR16_ende
+  CMP EDX,vx1
+  JL @barXOR16_ende
+  CMP ECX,vy1
+  JL @barXOR16_ende
+
+  CMP EAX,vx1
+  JGE @barXOR16_w3
+  MOV EAX,vx1
+@barXOR16_w3:
+  CMP EBX,vy1
+  JGE @barXOR16_w4
+  MOV EBX,vy1
+@barXOR16_w4:
+  CMP EDX,vx2
+  JLE @barXOR16_w5
+  MOV EDX,vx2
+@barXOR16_w5:
+  CMP ECX,vy2
+  JLE @barXOR16_w6
+  MOV ECX,vy2
+@barXOR16_w6:
+
+  SUB EDX,EAX
+  INC EDX
+  CLD
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  pUSH EAX
+  CALL pixofsB16
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EAX,f
+  MOV ESI,bytperline
+
+@barXOR16_loop1:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV ECX,EDX
+@barXOR16_loop2:
+  XOR [EDI],AX
+  ADD EDI,2
+  DEC ECX
+  JNZ @barXOR16_loop2
+  POP EDI
+  POP ECX
+  ADD DI,SI
+  JC @barXOR16_weiter
+  DEC ECX
+  JNZ @barXOR16_loop1
+  JMP @barXOR16_ende
+
+@barXOR16_weiter:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @barXOR16_loop1
+@barXOR16_ende:
+END;
+
+PROCEDURE barXORB24(x1,y1,x2,y2,f:longint);assembler;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+
+  CMP EAX,EDX
+  JLE @barXOR24_w1
+  XCHG EAX,EDX
+@barXOR24_w1:
+  CMP EBX,ECX
+  JLE @barXOR24_w2
+  XCHG EBX,ECX
+@barXOR24_w2:
+  CMP EAX,vx2
+  JG @barXOR24_ende
+  CMP EBX,vy2
+  JG @barXOR24_ende
+  CMP EDX,vx1
+  JL @barXOR24_ende
+  CMP ECX,vy1
+  JL @barXOR24_ende
+
+  CMP EAX,vx1
+  JGE @barXOR24_w3
+  MOV EAX,vx1
+@barXOR24_w3:
+  CMP EBX,vy1
+  JGE @barXOR24_w4
+  MOV EBX,vy1
+@barXOR24_w4:
+  CMP EDX,vx2
+  JLE @barXOR24_w5
+  MOV EDX,vx2
+@barXOR24_w5:
+  CMP ECX,vy2
+  JLE @barXOR24_w6
+  MOV ECX,vy2
+@barXOR24_w6:
+
+  SUB EDX,EAX
+  INC EDX
+  CLD
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB24
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+  SUB ECX,EBX
+  INC ECX
+
+  MOV ESI,bytperline
+
+  MOV EAX,f
+  SHLD EBX,EAX,16
+
+@barXOR24_loop2:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV ECX,EDX
+@barXOR24_loop1:
+  XOR [EDI],AX
+  ADD EDI,2
+  XOR [EDI],BL
+  INC EDI
+  DEC ECX
+  JNZ @barXOR24_loop1
+  POP EDI
+  POP ECX
+  ADD DI,SI
+  JC @barXOR24_weiter
+  DEC ECX
+  JNZ @barXOR24_loop2
+  JMP @barXOR24_ende
+
+@barXOR24_weiter:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @barXOR24_loop2
+@barXOR24_ende:
+END;
+
+PROCEDURE barXORB32(x1,y1,x2,y2,f:longint);assembler;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+
+  CMP EAX,EDX
+  JLE @barXOR32_w1
+  XCHG EAX,EDX
+@barXOR32_w1:
+  CMP EBX,ECX
+  JLE @barXOR32_w2
+  XCHG EBX,ECX
+@barXOR32_w2:
+  CMP EAX,vx2
+  JG @barXOR32_ende
+  CMP EBX,vy2
+  JG @barXOR32_ende
+  CMP EDX,vx1
+  JL @barXOR32_ende
+  CMP ECX,vy1
+  JL @barXOR32_ende
+
+  CMP EAX,vx1
+  JGE @barXOR32_w3
+  MOV EAX,vx1
+@barXOR32_w3:
+  CMP EBX,vy1
+  JGE @barXOR32_w4
+  MOV EBX,vy1
+@barXOR32_w4:
+  CMP EDX,vx2
+  JLE @barXOR32_w5
+  MOV EDX,vx2
+@barXOR32_w5:
+  CMP ECX,vy2
+  JLE @barXOR32_w6
+  MOV ECX,vy2
+@barXOR32_w6:
+
+  SUB EDX,EAX
+  INC EDX
+  CLD
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB32
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EAX,f
+
+  MOV ESI,bytperline
+
+@barXOR32_loop1:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV ECX,EDX
+@barXOR32_loop2:
+  XOR [EDI],EAX
+  ADD EDI,4
+  DEC ECX
+  JNZ @barXOR32_loop2
+  POP EDI
+  POP ECX
+
+  ADD DI,SI
+  JC @barXOR32_weiter
+  DEC ECX
+  JNZ @barXOR32_loop1
+  JMP @barXOR32_ende
+@barXOR32_weiter:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @barXOR32_loop1
+@barXOR32_ende:
+END;
+
+{================================ bar_pattern ==============================}
+
+PROCEDURE barXOR_patternB8(x1,y1,x2,y2,f:longint);assembler;
+VAR patpos:longint;
+    patrot:byte;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+
+  CMP EAX,EDX
+  JLE @barx8p_w1
+  XCHG EAX,EDX
+@barx8p_w1:
+  CMP EBX,ECX
+  JLE @barx8p_w2
+  XCHG EBX,ECX
+@barx8p_w2:
+  CMP EAX,vx2
+  JG @barx8p_ende
+  CMP EBX,vy2
+  JG @barx8p_ende
+  CMP EDX,vx1
+  JL @barx8p_ende
+  CMP ECX,vy1
+  JL @barx8p_ende
+
+  CMP EAX,vx1
+  JGE @barx8p_w3
+  MOV EAX,vx1
+@barx8p_w3:
+  CMP EBX,vy1
+  JGE @barx8p_w4
+  MOV EBX,vy1
+@barx8p_w4:
+  CMP EDX,vx2
+  JLE @barx8p_w5
+  MOV EDX,vx2
+@barx8p_w5:
+  CMP ECX,vy2
+  JLE @barx8p_w6
+  MOV ECX,vy2
+@barx8p_w6:
+
+  SUB EDX,EAX
+  INC EDX
+  CLD
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+
+  MOV EDX,EAX
+  INC EDX
+  AND EDX,7
+  MOV patrot,DL
+  MOV EDX,EBX
+  AND EDX,7
+  MOV patpos,EDX
+
+  CALL pixofsB8
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EAX,f
+  MOV ESI,bytperline
+
+@barx8p_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+{  MOV ECX,EDX
+  REP STOSB }
+  MOV ECX,patpos
+  MOV EBX,curpattern
+  MOV BL,[ECX+EBX]
+  INC ECX
+  AND ECX,7
+  MOV patpos,ECX
+  MOV CL,patrot
+  ROR BL,CL
+  MOV ECX,EDX
+@barx8p_loop1:
+  TEST BL,80h
+  JZ @barx8p_nopix
+  XOR [EDI],AL
+@barx8p_nopix:
+  INC EDI
+  ROR BL,1
+  DEC ECX
+  JNZ @barx8p_loop1
+
+  POP EDI
+  POP ECX
+  ADD DI,SI
+  JC @barx8p_bankswitch
+  DEC ECX
+  JNZ @barx8p_loop
+  JMP @barx8p_ende
+@barx8p_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @barx8p_loop
+@barx8p_ende:
+END;
+
+PROCEDURE barXOR_patternB16(x1,y1,x2,y2,f:longint);assembler;
+VAR patpos:longint;
+    patrot:byte;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+
+  CMP EAX,EDX
+  JLE @barx16p_w1
+  XCHG EAX,EDX
+@barx16p_w1:
+  CMP EBX,ECX
+  JLE @barx16p_w2
+  XCHG EBX,ECX
+@barx16p_w2:
+  CMP EAX,vx2
+  JG @barx16p_ende
+  CMP EBX,vy2
+  JG @barx16p_ende
+  CMP EDX,vx1
+  JL @barx16p_ende
+  CMP ECX,vy1
+  JL @barx16p_ende
+
+  CMP EAX,vx1
+  JGE @barx16p_w3
+  MOV EAX,vx1
+@barx16p_w3:
+  CMP EBX,vy1
+  JGE @barx16p_w4
+  MOV EBX,vy1
+@barx16p_w4:
+  CMP EDX,vx2
+  JLE @barx16p_w5
+  MOV EDX,vx2
+@barx16p_w5:
+  CMP ECX,vy2
+  JLE @barx16p_w6
+  MOV ECX,vy2
+@barx16p_w6:
+
+  SUB EDX,EAX
+  INC EDX
+  CLD
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+
+  MOV EDX,EAX
+  INC EDX
+  AND EDX,7
+  MOV patrot,DL
+  MOV EDX,EBX
+  AND EDX,7
+  MOV patpos,EDX
+
+  CALL pixofsB16
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EAX,f
+  MOV ESI,bytperline
+
+@barx16p_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV ECX,patpos
+  MOV EBX,curpattern
+  MOV BL,[ECX+EBX]
+  INC ECX
+  AND ECX,7
+  MOV patpos,ECX
+  MOV CL,patrot
+  ROR BL,CL
+  MOV ECX,EDX
+@barx16p_loop1:
+  TEST BL,80h
+  JZ @barx16p_nopix
+  XOR [EDI],AX
+@barx16p_nopix:
+  ADD EDI,2
+  ROR BL,1
+  DEC ECX
+  JNZ @barx16p_loop1
+
+  POP EDI
+  POP ECX
+  ADD DI,SI
+  JC @barx16p_bankswitch
+  DEC ECX
+  JNZ @barx16p_loop
+  JMP @barx16p_ende
+@barx16p_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @barx16p_loop
+@barx16p_ende:
+END;
+
+PROCEDURE barXOR_patternB24(x1,y1,x2,y2,f:longint);assembler;
+VAR patpos:longint;
+    patrot:byte;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+
+  CMP EAX,EDX
+  JLE @barx24p_w1
+  XCHG EAX,EDX
+@barx24p_w1:
+  CMP EBX,ECX
+  JLE @barx24p_w2
+  XCHG EBX,ECX
+@barx24p_w2:
+  CMP EAX,vx2
+  JG @barx24p_ende
+  CMP EBX,vy2
+  JG @barx24p_ende
+  CMP EDX,vx1
+  JL @barx24p_ende
+  CMP ECX,vy1
+  JL @barx24p_ende
+
+  CMP EAX,vx1
+  JGE @barx24p_w3
+  MOV EAX,vx1
+@barx24p_w3:
+  CMP EBX,vy1
+  JGE @barx24p_w4
+  MOV EBX,vy1
+@barx24p_w4:
+  CMP EDX,vx2
+  JLE @barx24p_w5
+  MOV EDX,vx2
+@barx24p_w5:
+  CMP ECX,vy2
+  JLE @barx24p_w6
+  MOV ECX,vy2
+@barx24p_w6:
+
+  SUB EDX,EAX
+  INC EDX
+  CLD
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+
+  MOV EDX,EAX
+  INC EDX
+  AND EDX,7
+  MOV patrot,DL
+  MOV EDX,EBX
+  AND EDX,7
+  MOV patpos,EDX
+
+  CALL pixofsB24
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EAX,f
+  MOV ESI,bytperline
+
+@barx24p_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV ECX,patpos
+  MOV EBX,curpattern
+  MOV BL,[ECX+EBX]
+  INC ECX
+  AND ECX,7
+  MOV patpos,ECX
+  MOV CL,patrot
+  ROR BL,CL
+  MOV ECX,EDX
+@barx24p_loop1:
+  TEST BL,80h
+  JZ @barx24p_nopix
+  XOR [EDI],AX
+  ROR EAX,16
+  XOR [EDI+2],AL
+  ROR EAX,16
+@barx24p_nopix:
+  ADD EDI,3
+  ROR BL,1
+  DEC ECX
+  JNZ @barx24p_loop1
+
+  POP EDI
+  POP ECX
+  ADD DI,SI
+  JC @barx24p_bankswitch
+  DEC ECX
+  JNZ @barx24p_loop
+  JMP @barx24p_ende
+@barx24p_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @barx24p_loop
+@barx24p_ende:
+END;
+
+PROCEDURE barXOR_patternB32(x1,y1,x2,y2,f:longint);assembler;
+VAR patpos:longint;
+    patrot:byte;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+
+  CMP EAX,EDX
+  JLE @barx32p_w1
+  XCHG EAX,EDX
+@barx32p_w1:
+  CMP EBX,ECX
+  JLE @barx32p_w2
+  XCHG EBX,ECX
+@barx32p_w2:
+  CMP EAX,vx2
+  JG @barx32p_ende
+  CMP EBX,vy2
+  JG @barx32p_ende
+  CMP EDX,vx1
+  JL @barx32p_ende
+  CMP ECX,vy1
+  JL @barx32p_ende
+
+  CMP EAX,vx1
+  JGE @barx32p_w3
+  MOV EAX,vx1
+@barx32p_w3:
+  CMP EBX,vy1
+  JGE @barx32p_w4
+  MOV EBX,vy1
+@barx32p_w4:
+  CMP EDX,vx2
+  JLE @barx32p_w5
+  MOV EDX,vx2
+@barx32p_w5:
+  CMP ECX,vy2
+  JLE @barx32p_w6
+  MOV ECX,vy2
+@barx32p_w6:
+
+  SUB EDX,EAX
+  INC EDX
+  CLD
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+
+  MOV EDX,EAX
+  INC EDX
+  AND EDX,7
+  MOV patrot,DL
+  MOV EDX,EBX
+  AND EDX,7
+  MOV patpos,EDX
+
+  CALL pixofsB32
+  POP EBX
+  POP EDX
+  MOV EDI,EAX
+
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EAX,f
+  MOV ESI,bytperline
+
+@barx32p_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV ECX,patpos
+  MOV EBX,curpattern
+  MOV BL,[ECX+EBX]
+  INC ECX
+  AND ECX,7
+  MOV patpos,ECX
+  MOV CL,patrot
+  ROR BL,CL
+  MOV ECX,EDX
+@barx32p_loop1:
+  TEST BL,80h
+  JZ @barx32p_nopix
+  XOR [EDI],EAX
+@barx32p_nopix:
+  ADD EDI,4
+  ROR BL,1
+  DEC ECX
+  JNZ @barx32p_loop1
+
+  POP EDI
+  POP ECX
+  ADD DI,SI
+  JC @barx32p_bankswitch
+  DEC ECX
+  JNZ @barx32p_loop
+  JMP @barx32p_ende
+@barx32p_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @barx32p_loop
+@barx32p_ende:
+END;
+
+{========================= moverect ==================================}
+
+PROCEDURE moverectB8(x1,y1,x2,y2,x,y:longint);assembler;
+VAR mxd:longint;
+ASM
+  MOV EAX,bytperline
+  MOV mxd,EAX
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+  MOV ESI,y
+
+  CMP EAX,EDX
+  JLE @mr8_w1
+  XCHG EAX,EDX
+@mr8_w1:
+  CMP EBX,ECX
+  JLE @mr8_w2
+  XCHG EBX,ECX
+@mr8_w2:
+  CMP EAX,vx2
+  JG @mr8_ende
+  CMP EBX,vy2
+  JG @mr8_ende
+  CMP EDX,vx1
+  JL @mr8_ende
+  CMP ECX,vy1
+  JL @mr8_ende
+
+  CMP EAX,vx1
+  JGE @mr8_w3
+  MOV EAX,vx1
+@mr8_w3:
+  CMP EBX,vy1
+  JGE @mr8_w4
+  MOV EBX,vy1
+@mr8_w4:
+  CMP EDX,vx2
+  JLE @mr8_w5
+  MOV EDX,vx2
+@mr8_w5:
+  CMP ECX,vy2
+  JLE @mr8_w6
+  MOV ECX,vy2
+@mr8_w6:
+
+  SUB EDX,EAX
+  INC EDX
+  SUB ECX,EBX
+  INC ECX
+
+  CMP EBX,ESI
+  JGE @mr8_w8
+  NEG mxd
+  ADD EBX,ECX
+  DEC EBX
+  ADD ESI,ECX
+  DEC ESI
+@mr8_w8:
+
+  PUSH EDX
+
+  PUSH ESI
+  PUSH x
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB8
+  MOV SI,curbank
+  SHL ESI,16
+  MOV SI,AX
+
+  CALL pixofsB8
+  MOV DI,curbank
+  SHL EDI,16
+  MOV DI,AX
+
+  POP EDX
+
+  CLD
+@mr8_loop1:
+  PUSH ESI
+  PUSH EDI
+  PUSH ECX
+
+  PUSH EDI
+  MOV EDI,graphbuf
+  SHLD EAX,ESI,16
+  CMP AX,curbank
+  JE @mr8_nobank1
+  PUSH EDX
+  MOV DX,AX
+  MOV curbank,AX
+  CALL bankswitch
+  POP EDX
+@mr8_nobank1:
+  MOV ECX,EDX
+  SHR ECX,2
+  MOVZX ESI,SI
+  ADD ESI,VGAbase
+  REP MOVSD
+  MOV ECX,EDX
+  AND ECX,0003h
+  REP MOVSB
+  POP EDI
+
+  MOV ESI,graphbuf
+  SHLD EAX,EDI,16
+  CMP AX,curbank
+  JE @mr8_nobank2
+  PUSH EDX
+  MOV DX,AX
+  MOV curbank,AX
+  CALL bankswitch
+  POP EDX
+@mr8_nobank2:
+  MOV ECX,EDX
+  SHR ECX,2
+  MOVZX EDI,DI
+  ADD EDI,VGAbase
+  REP MOVSD
+  MOV ECX,EDX
+  AND ECX,0003h
+  REP MOVSB
+
+  POP ECX
+  POP EDI
+  POP ESI
+  ADD ESI,mxd
+  ADD EDI,mxd
+  DEC ECX
+  JNZ @mr8_loop1
+@mr8_ende:
+END;
+
+PROCEDURE moverectB16(x1,y1,x2,y2,x,y:longint);assembler;
+VAR mxd:longint;
+ASM
+  MOV EAX,bytperline
+  MOV mxd,EAX
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+  MOV ESI,y
+
+  CMP EAX,EDX
+  JLE @mr16_w1
+  XCHG EAX,EDX
+@mr16_w1:
+  CMP EBX,ECX
+  JLE @mr16_w2
+  XCHG EBX,ECX
+@mr16_w2:
+  CMP EAX,vx2
+  JG @mr16_ende
+  CMP EBX,vy2
+  JG @mr16_ende
+  CMP EDX,vx1
+  JL @mr16_ende
+  CMP ECX,vy1
+  JL @mr16_ende
+
+  CMP EAX,vx1
+  JGE @mr16_w3
+  MOV EAX,vx1
+@mr16_w3:
+  CMP EBX,vy1
+  JGE @mr16_w4
+  MOV EBX,vy1
+@mr16_w4:
+  CMP EDX,vx2
+  JLE @mr16_w5
+  MOV EDX,vx2
+@mr16_w5:
+  CMP ECX,vy2
+  JLE @mr16_w6
+  MOV ECX,vy2
+@mr16_w6:
+
+  SUB EDX,EAX
+  INC EDX
+  SUB ECX,EBX
+  INC ECX
+
+  CMP EBX,ESI
+  JGE @mr16_w8
+  NEG mxd
+  ADD EBX,ECX
+  DEC EBX
+  ADD ESI,ECX
+  DEC ESI
+@mr16_w8:
+
+  PUSH EDX
+  PUSH ESI
+  PUSH x
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB16
+  MOV SI,curbank
+  SHL ESI,16
+  MOV SI,AX
+
+  CALL pixofsB16
+  MOV DI,curbank
+  SHL EDI,16
+  MOV DI,AX
+  POP EDX
+
+  CLD
+@mr16_loop1:
+  PUSH ESI
+  PUSH EDI
+  PUSH ECX
+
+  PUSH EDI
+  MOV EDI,graphbuf
+  SHLD EAX,ESI,16
+  CMP AX,curbank
+  JE @mr16_nobank1
+  PUSH EDX
+  MOV DX,AX
+  MOV curbank,AX
+  CALL bankswitch
+  POP EDX
+@mr16_nobank1:
+  MOV ECX,EDX
+  SHR ECX,1
+  MOVZX ESI,SI
+  ADD ESI,VGAbase
+  REP MOVSD
+  MOV ECX,EDX
+  AND ECX,0001h
+  REP MOVSW
+  POP EDI
+
+  MOV ESI,graphbuf
+  SHLD EAX,EDI,16
+  CMP AX,curbank
+  JE @mr16_nobank2
+  PUSH EDX
+  MOV DX,AX
+  MOV curbank,AX
+  CALL bankswitch
+  POP EDX
+@mr16_nobank2:
+  MOV ECX,EDX
+  SHR ECX,1
+  MOVZX EDI,DI
+  ADD EDI,VGAbase
+  REP MOVSD
+  MOV ECX,EDX
+  AND ECX,0001h
+  REP MOVSW
+
+  POP ECX
+  POP EDI
+  POP ESI
+  ADD ESI,mxd
+  ADD EDI,mxd
+  DEC ECX
+  JNZ @mr16_loop1
+@mr16_ende:
+END;
+
+PROCEDURE moverectB24(x1,y1,x2,y2,x,y:longint);assembler;
+VAR mxd:longint;
+ASM
+  MOV EAX,bytperline
+  MOV mxd,EAX
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+  MOV ESI,y
+
+  CMP EAX,EDX
+  JLE @mr24_w1
+  XCHG EAX,EDX
+@mr24_w1:
+  CMP EBX,ECX
+  JLE @mr24_w2
+  XCHG EBX,ECX
+@mr24_w2:
+  CMP EAX,vx2
+  JG @mr24_ende
+  CMP EBX,vy2
+  JG @mr24_ende
+  CMP EDX,vx1
+  JL @mr24_ende
+  CMP ECX,vy1
+  JL @mr24_ende
+
+  CMP EAX,vx1
+  JGE @mr24_w3
+  MOV EAX,vx1
+@mr24_w3:
+  CMP EBX,vy1
+  JGE @mr24_w4
+  MOV EBX,vy1
+@mr24_w4:
+  CMP EDX,vx2
+  JLE @mr24_w5
+  MOV EDX,vx2
+@mr24_w5:
+  CMP ECX,vy2
+  JLE @mr24_w6
+  MOV ECX,vy2
+@mr24_w6:
+
+  SUB EDX,EAX
+  INC EDX
+  SUB ECX,EBX
+  INC ECX
+
+  CMP EBX,ESI
+  JGE @mr24_w8
+  NEG mxd
+  ADD EBX,ECX
+  DEC EBX
+  ADD ESI,ECX
+  DEC ESI
+@mr24_w8:
+
+  PUSH EDX
+  PUSH ESI
+  PUSH x
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB24
+  MOV SI,curbank
+  SHL ESI,16
+  MOV SI,AX
+  CALL pixofsB24
+  MOV DI,curbank
+  SHL EDI,16
+  MOV DI,AX
+  POP EDX
+
+  MOV EAX,EDX
+  SHL EAX,1
+  ADD EDX,EAX
+
+  CLD
+@mr24_loop1:
+  PUSH ESI
+  PUSH EDI
+  PUSH ECX
+
+  PUSH EDI
+  MOV EDI,graphbuf
+  SHLD EAX,ESI,16
+  CMP AX,curbank
+  JE @mr24_nobank1
+  PUSH EDX
+  MOV DX,AX
+  MOV curbank,AX
+  CALL bankswitch
+  POP EDX
+@mr24_nobank1:
+  MOV ECX,EDX
+  SHR ECX,2
+  MOVZX ESI,SI
+  ADD ESI,VGAbase
+  REP MOVSD
+  MOV ECX,EDX
+  AND ECX,0003h
+  REP MOVSB
+  POP EDI
+
+  MOV ESI,graphbuf
+  SHLD EAX,EDI,16
+  CMP AX,curbank
+  JE @mr24_nobank2
+  PUSH EDX
+  MOV DX,AX
+  MOV curbank,AX
+  CALL bankswitch
+  POP EDX
+@mr24_nobank2:
+  MOV ECX,EDX
+  SHR ECX,2
+  MOVZX EDI,DI
+  ADD EDI,VGAbase
+  REP MOVSD
+  MOV ECX,EDX
+  AND ECX,0003h
+  REP MOVSB
+
+  POP ECX
+  POP EDI
+  POP ESI
+  ADD ESI,mxd
+  ADD EDI,mxd
+  DEC ECX
+  JNZ @mr24_loop1
+@mr24_ende:
+END;
+
+PROCEDURE moverectB32(x1,y1,x2,y2,x,y:longint);assembler;
+VAR mxd:longint;
+ASM
+  MOV EAX,bytperline
+  MOV mxd,EAX
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+  MOV ESI,y
+
+  CMP EAX,EDX
+  JLE @mr32_w1
+  XCHG EAX,EDX
+@mr32_w1:
+  CMP EBX,ECX
+  JLE @mr32_w2
+  XCHG EBX,ECX
+@mr32_w2:
+  CMP EAX,vx2
+  JG @mr32_ende
+  CMP EBX,vy2
+  JG @mr32_ende
+  CMP EDX,vx1
+  JL @mr32_ende
+  CMP ECX,vy1
+  JL @mr32_ende
+
+  CMP EAX,vx1
+  JGE @mr32_w3
+  MOV EAX,vx1
+@mr32_w3:
+  CMP EBX,vy1
+  JGE @mr32_w4
+  MOV EBX,vy1
+@mr32_w4:
+  CMP EDX,vx2
+  JLE @mr32_w5
+  MOV EDX,vx2
+@mr32_w5:
+  CMP ECX,vy2
+  JLE @mr32_w6
+  MOV ECX,vy2
+@mr32_w6:
+
+  SUB EDX,EAX
+  INC EDX
+  SUB ECX,EBX
+  INC ECX
+
+  CMP EBX,ESI
+  JGE @mr32_w8
+  NEG mxd
+  ADD EBX,ECX
+  DEC EBX
+  ADD ESI,ECX
+  DEC ESI
+@mr32_w8:
+
+  PUSH EDX
+
+  PUSH ESI
+  PUSH x
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB32
+  MOV SI,curbank
+  SHL ESI,16
+  MOV SI,AX
+  CALL pixofsB32
+  MOV DI,curbank
+  SHL EDI,16
+  MOV DI,AX
+
+  POP EDX
+
+  CLD
+@mr32_loop1:
+  PUSH ESI
+  PUSH EDI
+  PUSH ECX
+
+  PUSH EDI
+  MOV EDI,graphbuf
+  SHLD EAX,ESI,16
+  CMP AX,curbank
+  JE @mr32_nobank1
+  PUSH EDX
+  MOV DX,AX
+  MOV curbank,AX
+  CALL bankswitch
+  POP EDX
+@mr32_nobank1:
+  MOV ECX,EDX
+  MOVZX ESI,SI
+  ADD ESI,VGAbase
+  REP MOVSD
+  POP EDI
+
+  MOV ESI,graphbuf
+  SHLD EAX,EDI,16
+  CMP AX,curbank
+  JE @mr32_nobank2
+  PUSH EDX
+  MOV DX,AX
+  MOV curbank,AX
+  CALL bankswitch
+  POP EDX
+@mr32_nobank2:
+  MOV ECX,EDX
+  MOVZX EDI,DI
+  ADD EDI,VGAbase
+  REP MOVSD
+
+  POP ECX
+  POP EDI
+  POP ESI
+  ADD ESI,mxd
+  ADD EDI,mxd
+  DEC ECX
+  JNZ @mr32_loop1
+@mr32_ende:
+END;
+
+{============================= captureimage ===================================}
+
+FUNCTION captureimageB8(x1,y1,x2,y2:longint;img:pimage):pimage;assembler;
+ASM
+  MOV EAX,x1
+  MOV EDX,y1
+  MOV EBX,x2
+  MOV ECX,y2
+
+  CMP EAX,EBX
+  JLE @ci8_w1
+  XCHG EAX,EBX
+@ci8_w1:
+  CMP EDX,ECX
+  JLE @ci8_w2
+  XCHG EDX,ECX
+@ci8_w2:
+
+  CMP EAX,vx2
+  JG @ci8_ende
+  CMP EDX,vy2
+  JG @ci8_ende
+  CMP EBX,vx1
+  JL @ci8_ende
+  CMP ECX,vy1
+  JL @ci8_ende
+
+  CMP EAX,vx1
+  JGE @ci8_w3
+  MOV EAX,vx1
+@ci8_w3:
+
+  CMP EDX,vy1
+  JGE @ci8_w4
+  MOV EDX,vy1
+@ci8_w4:
+
+  CMP EBX,vx2
+  JLE @ci8_w5
+  MOV EBX,vx2
+@ci8_w5:
+
+  CMP ECX,vy2
+  JLE @ci8_w6
+  MOV ECX,vy2
+@ci8_w6:
+  SUB EBX,EAX
+  SUB ECX,EDX
+  INC EBX
+  INC ECX
+
+  MOV EDI,img
+  CMP EBX,[EDI+timage.width]
+  JLE @ci8_w7
+  MOV EBX,[EDI+timage.width]
+@ci8_w7:
+  CMP ECX,[EDI+timage.height]
+  JLE @ci8_w8
+  MOV ECX,[EDI+timage.height]
+@ci8_w8:
+
+  PUSH EBX
+  PUSH EDX
+  PUSH EAX
+  CALL pixofsB8
+  MOV ESI,EAX
+  POP EBX
+
+  MOV EDX,[EDI+timage.bytesperline]
+  SUB EDX,EBX
+
+  MOV EDI,[EDI+timage.pixeldata]
+
+  MOV EAX,EBX
+  AND EAX,3
+  SHR EBX,2
+  CLD
+@ci8_loop:
+  PUSH ECX
+  PUSH ESI
+  ADD ESI,VGAbase
+  MOV ECX,EBX
+  REP MOVSD
+  MOV ECX,EAX
+  REP MOVSB
+  POP ESI
+  POP ECX
+  ADD EDI,EDX
+  ADD SI,WORD PTR bytperline
+  JC @ci8_bankswitch
+  DEC ECX
+  JNZ @ci8_loop
+  JMP @ci8_ende
+@ci8_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @ci8_loop
+@ci8_ende:
+END;
+
+FUNCTION captureimageB16(x1,y1,x2,y2:longint;img:pimage):pimage;assembler;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+
+  CMP EAX,EDX
+  JLE @ci16_w1
+  XCHG EAX,EDX
+@ci16_w1:
+  CMP EBX,ECX
+  JLE @ci16_w2
+  XCHG EBX,ECX
+@ci16_w2:
+
+  CMP EAX,vx2
+  JG @ci16_ende
+  CMP EBX,vy2
+  JG @ci16_ende
+  CMP EDX,vx1
+  JL @ci16_ende
+  CMP ECX,vy1
+  JL @ci16_ende
+
+  CMP EAX,vx1
+  JGE @ci16_w3
+  MOV EAX,vx1
+@ci16_w3:
+
+  CMP EBX,vy1
+  JGE @ci16_w4
+  MOV EBX,vy1
+@ci16_w4:
+
+  CMP EDX,vx2
+  JLE @ci16_w5
+  MOV EDX,vx2
+@ci16_w5:
+
+  CMP ECX,vy2
+  JLE @ci16_w6
+  MOV ECX,vy2
+@ci16_w6:
+  SUB EBX,EAX
+  SUB ECX,EDX
+  INC EBX
+  INC ECX
+
+  MOV EDI,img
+  CMP EBX,[EDI+timage.width]
+  JLE @ci16_w7
+  MOV EBX,[EDI+timage.width]
+@ci16_w7:
+  CMP ECX,[EDI+timage.height]
+  JLE @ci16_w8
+  MOV ECX,[EDI+timage.height]
+@ci16_w8:
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB16
+  MOV ESI,EAX
+  POP EDX
+
+  MOV EBX,[EDI+timage.bytesperline]
+  SUB EBX,EDX
+  SUB EBX,EDX
+
+  MOV EDI,[EDI+timage.pixeldata]
+
+  MOV EAX,EDX
+  AND EAX,1
+  SHR EDX,1
+  CLD
+@ci16_loop:
+  PUSH ECX
+  PUSH ESI
+  ADD ESI,VGAbase
+  MOV ECX,EDX
+  REP MOVSD
+  MOV ECX,EAX
+  REP MOVSW
+  POP ESI
+  POP ECX
+  ADD EDI,EBX
+  ADD SI,WORD PTR bytperline
+  JC @ci16_bankswitch
+  DEC ECX
+  JNZ @ci16_loop
+  JMP @ci16_ende
+@ci16_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @ci16_loop
+@ci16_ende:
+END;
+
+FUNCTION captureimageB24(x1,y1,x2,y2:longint;img:pimage):pimage;assembler;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+
+  CMP EAX,EDX
+  JLE @ci24_w1
+  XCHG EAX,EDX
+@ci24_w1:
+  CMP EBX,ECX
+  JLE @ci24_w2
+  XCHG EBX,ECX
+@ci24_w2:
+
+  CMP EAX,vx2
+  JG @ci24_ende
+  CMP EBX,vy2
+  JG @ci24_ende
+  CMP EDX,vx1
+  JL @ci24_ende
+  CMP ECX,vy1
+  JL @ci24_ende
+
+  CMP EAX,vx1
+  JGE @ci24_w3
+  MOV EAX,vx1
+@ci24_w3:
+
+  CMP EBX,vy1
+  JGE @ci24_w4
+  MOV EBX,vy1
+@ci24_w4:
+
+  CMP EDX,vx2
+  JLE @ci24_w5
+  MOV EDX,vx2
+@ci24_w5:
+
+  CMP ECX,vy2
+  JLE @ci24_w6
+  MOV ECX,vy2
+@ci24_w6:
+
+  SUB EBX,EAX
+  SUB ECX,EDX
+  INC EBX
+  INC ECX
+
+  MOV EDI,img
+  CMP EBX,[EDI+timage.width]
+  JLE @ci24_w7
+  MOV EBX,[EDI+timage.width]
+@ci24_w7:
+  CMP ECX,[EDI+timage.height]
+  JLE @ci24_w8
+  MOV ECX,[EDI+timage.height]
+@ci24_w8:
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB24
+  MOV ESI,EAX
+  POP EDX
+
+  MOV EBX,[EDI+timage.bytesperline]
+
+  MOV EDI,[EDI+timage.pixeldata]
+
+  MOV EAX,EDX
+  SHL EDX,1
+  ADD EDX,EAX
+  SUB EBX,EDX
+  MOV EAX,EDX
+  AND EAX,3
+  SHR EDX,2
+  CLD
+@ci24_loop:
+  PUSH ECX
+  PUSH ESI
+  ADD ESI,VGAbase
+  MOV ECX,EDX
+  REP MOVSD
+  MOV ECX,EAX
+  REP MOVSB
+  POP ESI
+  POP ECX
+  ADD EDI,EBX
+  ADD SI,WORD PTR bytperline
+  JC @ci24_bankswitch
+  DEC ECX
+  JNZ @ci24_loop
+  JMP @ci24_ende
+@ci24_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @ci24_loop
+@ci24_ende:
+END;
+
+FUNCTION captureimageB32(x1,y1,x2,y2:longint;img:pimage):pimage;assembler;
+ASM
+  MOV EAX,x1
+  MOV EBX,y1
+  MOV EDX,x2
+  MOV ECX,y2
+
+  CMP EAX,EDX
+  JLE @ci32_w1
+  XCHG EAX,EDX
+@ci32_w1:
+  CMP EBX,ECX
+  JLE @ci32_w2
+  XCHG EBX,ECX
+@ci32_w2:
+
+  CMP EAX,vx2
+  JG @ci32_ende
+  CMP EBX,vy2
+  JG @ci32_ende
+  CMP EDX,vx1
+  JL @ci32_ende
+  CMP ECX,vy1
+  JL @ci32_ende
+
+  CMP EAX,vx1
+  JGE @ci32_w3
+  MOV EAX,vx1
+@ci32_w3:
+
+  CMP EBX,vy1
+  JGE @ci32_w4
+  MOV EBX,vy1
+@ci32_w4:
+
+  CMP EDX,vx2
+  JLE @ci32_w5
+  MOV EDX,vx2
+@ci32_w5:
+
+  CMP ECX,vy2
+  JLE @ci32_w6
+  MOV ECX,vy2
+@ci32_w6:
+  SUB EBX,EAX
+  SUB ECX,EDX
+  INC EBX
+  INC ECX
+
+  MOV EDI,img
+  CMP EBX,[EDI+timage.width]
+  JLE @ci32_w7
+  MOV EBX,[EDI+timage.width]
+@ci32_w7:
+  CMP ECX,[EDI+timage.height]
+  JLE @ci32_w8
+  MOV ECX,[EDI+timage.height]
+@ci32_w8:
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB32
+  MOV ESI,EAX
+  POP EDX
+
+  MOV EBX,[EDI+timage.bytesperline]
+  SHL EDX,2
+  SUB EBX,EDX
+  SHR EDX,2
+
+  MOV EDI,[EDI+timage.pixeldata]
+  CLD
+@ci32_loop:
+  PUSH ECX
+  PUSH ESI
+  ADD ESI,VGAbase
+  MOV ECX,EDX
+  REP MOVSD
+  POP ESI
+  POP ECX
+  ADD EDI,EBX
+  ADD SI,WORD PTR bytperline
+  JC @ci32_bankswitch
+  DEC ECX
+  JNZ @ci32_loop
+  JMP @ci32_ende
+@ci32_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @ci32_loop
+@ci32_ende:
+END;
+
+{============================= getimageB ===================================}
+
+FUNCTION getimageB8(x,y:longint;img:pimage):pimage;assembler;
+ASM
+  MOV EDI,img
+  MOV EAX,x
+  MOV EBX,y
+  MOV EDX,EAX
+  ADD EDX,[EDI+timage.width]
+  DEC EDX
+  MOV ECX,EBX
+  ADD ECX,[EDI+timage.height]
+  DEC ECX
+
+  CMP EAX,vx2
+  JG @gi8_ende
+  CMP EBX,vy2
+  JG @gi8_ende
+  CMP EDX,vx1
+  JL @gi8_ende
+  CMP ECX,vy1
+  JL @gi8_ende
+
+  XOR ESI,ESI
+
+  CMP EAX,vx1
+  JGE @gi8_w1
+  MOV ESI,vx1
+  SUB ESI,EAX
+  MOV EAX,vx1
+@gi8_w1:
+
+  CMP EBX,vy1
+  JGE @gi8_w2
+  PUSH EAX
+  PUSH EDX
+  MOV EAX,vy1
+  SUB EAX,EBX
+  MUL DWORD PTR [EDI+timage.bytesperline]
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EBX,vy1
+@gi8_w2:
+
+  CMP EDX,vx2
+  JLE @gi8_w3
+  MOV EDX,vx2
+@gi8_w3:
+
+  CMP ECX,vy2
+  JLE @gi8_w4
+  MOV ECX,vy2
+@gi8_w4:
+
+  SUB EDX,EAX
+  INC EDX
+  MOV EDI,[EDI+timage.bytesperline]
+  SUB EDI,EDX
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB8
+  POP EBX
+  POP EDX
+  XCHG EAX,EDI
+
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EBX,img
+  ADD ESI,[EBX+timage.pixeldata]
+{  ADD ESI,imagedatastart
+  ADD ESI,img }
+
+  MOV EBX,bytperline
+  XCHG ESI,EDI
+  CLD
+@gi8_loop:
+  PUSH ECX
+  PUSH ESI
+  ADD ESI,VGAbase
+  MOV ECX,EDX
+  SHR ECX,2
+  REP MOVSD
+  MOV ECX,EDX
+  AND ECX,3
+  REP MOVSB
+  POP ESI
+  POP ECX
+
+  ADD EDI,EAX
+  ADD SI,BX
+  JC @gi8_weiter
+  DEC ECX
+  JNZ @gi8_loop
+  JMP @gi8_ende
+@gi8_weiter:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @gi8_loop
+@gi8_ende:
+  MOV EAX,img
+END;
+
+FUNCTION getimageB16(x,y:longint;img:pimage):pimage;assembler;
+ASM
+  MOV EDI,img
+  MOV EAX,x
+  MOV EBX,y
+  MOV EDX,EAX
+  ADD EDX,[EDI+timage.width]
+  DEC EDX
+  MOV ECX,EBX
+  ADD ECX,[EDI+timage.height]
+  DEC ECX
+
+  CMP EAX,vx2
+  JG @gi16_ende
+  CMP EBX,vy2
+  JG @gi16_ende
+  CMP EDX,vx1
+  JL @gi16_ende
+  CMP ECX,vy1
+  JL @gi16_ende
+
+  XOR ESI,ESI
+
+  CMP EAX,vx1
+  JGE @gi16_w1
+  MOV ESI,vx1
+  SUB ESI,EAX
+  SHL ESI,1
+  MOV EAX,vx1
+@gi16_w1:
+
+  CMP EBX,vy1
+  JGE @gi16_w2
+  PUSH EAX
+  PUSH EDX
+  MOV EAX,vy1
+  SUB EAX,EBX
+  MUL DWORD PTR [EDI+timage.bytesperline]
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EBX,vy1
+@gi16_w2:
+
+  CMP EDX,vx2
+  JLE @gi16_w3
+  MOV EDX,vx2
+@gi16_w3:
+
+  CMP ECX,vy2
+  JLE @gi16_w4
+  MOV ECX,vy2
+@gi16_w4:
+
+  SUB EDX,EAX
+  INC EDX
+  MOV EDI,[EDI+timage.bytesperline]
+  SUB EDI,EDX
+  SUB EDI,EDX
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB16
+  POP EBX
+  POP EDX
+  XCHG EAX,EDI
+
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EBX,img
+  ADD ESI,[EBX+timage.pixeldata]
+
+{  ADD ESI,imagedatastart
+  ADD ESI,img }
+
+  MOV EBX,bytperline
+  XCHG ESI,EDI
+  CLD
+@gi16_loop:
+  PUSH ECX
+  PUSH ESI
+  ADD ESI,VGAbase
+  MOV ECX,EDX
+  SHR ECX,1
+  REP MOVSD
+  MOV ECX,EDX
+  AND ECX,1
+  REP MOVSW
+  POP ESI
+  POP ECX
+
+  ADD EDI,EAX
+  ADD SI,BX
+  JC @gi16_weiter
+  DEC ECX
+  JNZ @gi16_loop
+  JMP @gi16_ende
+@gi16_weiter:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @gi16_loop
+@gi16_ende:
+  MOV EAX,img
+END;
+
+FUNCTION getimageB24(x,y:longint;img:pimage):pimage;assembler;
+ASM
+  MOV EDI,img
+  MOV EAX,x
+  MOV EBX,y
+  MOV EDX,EAX
+  ADD EDX,[EDI+timage.width]
+  DEC EDX
+  MOV ECX,EBX
+  ADD ECX,[EDI+timage.height]
+  DEC ECX
+
+  CMP EAX,vx2
+  JG @gi24_ende
+  CMP EBX,vy2
+  JG @gi24_ende
+  CMP EDX,vx1
+  JL @gi24_ende
+  CMP ECX,vy1
+  JL @gi24_ende
+
+  XOR ESI,ESI
+
+  CMP EAX,vx1
+  JGE @gi24_w1
+  MOV ESI,vx1
+  SUB ESI,EAX
+  LEA ESI,[ESI+ESI*2]
+  MOV EAX,vx1
+@gi24_w1:
+
+  CMP EBX,vy1
+  JGE @gi24_w2
+  PUSH EAX
+  PUSH EDX
+  MOV EAX,vy1
+  SUB EAX,EBX
+  MUL DWORD PTR [EDI+timage.bytesperline]
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EBX,vy1
+@gi24_w2:
+
+  CMP EDX,vx2
+  JLE @gi24_w3
+  MOV EDX,vx2
+@gi24_w3:
+
+  CMP ECX,vy2
+  JLE @gi24_w4
+  MOV ECX,vy2
+@gi24_w4:
+
+  SUB EDX,EAX
+  INC EDX
+  MOV EDI,[EDI+timage.bytesperline]
+  SUB EDI,EDX
+  SUB EDI,EDX
+  SUB EDI,EDX
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB24
+  POP EBX
+  POP EDX
+  XCHG EAX,EDI
+
+  SUB ECX,EBX
+  INC ECX
+
+{  ADD ESI,imagedatastart
+  ADD ESI,img }
+  MOV EBX,img
+  ADD ESI,[EBX+timage.pixeldata]
+
+
+  MOV EBX,EDX
+  SHL EDX,1
+  ADD EDX,EBX
+
+  MOV EBX,bytperline
+  XCHG ESI,EDI
+  CLD
+@gi24_loop:
+  PUSH ECX
+  PUSH ESI
+  ADD ESI,VGAbase
+  MOV ECX,EDX
+  SHR ECX,2
+  REP MOVSD
+  MOV ECX,EDX
+  AND ECX,3
+  REP MOVSB
+  POP ESI
+  POP ECX
+
+  ADD EDI,EAX
+  ADD SI,BX
+  JC @gi24_weiter
+  DEC ECX
+  JNZ @gi24_loop
+  JMP @gi24_ende
+@gi24_weiter:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @gi24_loop
+@gi24_ende:
+  MOV EAX,img
+END;
+
+FUNCTION getimageB32(x,y:longint;img:pimage):pimage;assembler;
+ASM
+  MOV EDI,img
+  MOV EAX,x
+  MOV EBX,y
+  MOV EDX,EAX
+  ADD EDX,[EDI+timage.width]
+  DEC EDX
+  MOV ECX,EBX
+  ADD ECX,[EDI+timage.height]
+  DEC ECX
+
+  CMP EAX,vx2
+  JG @gi32_ende
+  CMP EBX,vy2
+  JG @gi32_ende
+  CMP EDX,vx1
+  JL @gi32_ende
+  CMP ECX,vy1
+  JL @gi32_ende
+
+  XOR ESI,ESI
+
+  CMP EAX,vx1
+  JGE @gi32_w1
+  ADD ESI,vx1
+  SUB ESI,EAX
+  SHL ESI,2
+  MOV EAX,vx1
+@gi32_w1:
+
+  CMP EBX,vy1
+  JGE @gi32_w2
+  PUSH EAX
+  PUSH EDX
+  MOV EAX,vy1
+  SUB EAX,EBX
+  MUL DWORD PTR [EDI+timage.bytesperline]
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EBX,vy1
+@gi32_w2:
+
+  CMP EDX,vx2
+  JLE @gi32_w3
+  MOV EDX,vx2
+@gi32_w3:
+
+  CMP ECX,vy2
+  JLE @gi32_w4
+  MOV ECX,vy2
+@gi32_w4:
+
+  SUB EDX,EAX
+  INC EDX
+  MOV EDI,[EDI+timage.bytesperline]
+  SHL EDX,2
+  SUB EDI,EDX
+  SHR EDX,2
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB32
+  POP EBX
+  POP EDX
+  XCHG EAX,EDI
+
+  SUB ECX,EBX
+  INC ECX
+
+{  ADD ESI,imagedatastart
+  ADD ESI,img }
+
+  MOV EBX,img
+  ADD ESI,[EBX+timage.pixeldata]
+
+  MOV EBX,bytperline
+  XCHG ESI,EDI
+  CLD
+@gi32_loop:
+  PUSH ECX
+  PUSH ESI
+  ADD ESI,VGAbase
+  MOV ECX,EDX
+  REP MOVSD
+  POP ESI
+  POP ECX
+
+  ADD EDI,EAX
+  ADD SI,BX
+  JC @gi32_weiter
+  DEC ECX
+  JNZ @gi32_loop
+  JMP @gi32_ende
+
+@gi32_weiter:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @gi32_loop
+@gi32_ende:
+  MOV EAX,img
+END;
+
+{============================= putimageB ===================================}
+
+PROCEDURE putimageB8(x,y:longint;img:pimage);assembler;
+ASM
+  MOV EDI,img
+  MOV EAX,x
+  MOV EBX,y
+  MOV EDX,EAX
+  ADD EDX,[EDI+timage.width]
+  DEC EDX
+  MOV ECX,EBX
+  ADD ECX,[EDI+timage.height]
+  DEC ECX
+
+  CMP EAX,vx2
+  JG @pi8_ende
+  CMP EBX,vy2
+  JG @pi8_ende
+  CMP EDX,vx1
+  JL @pi8_ende
+  CMP ECX,vy1
+  JL @pi8_ende
+
+  XOR ESI,ESI
+
+  CMP EAX,vx1
+  JGE @pi8_w1
+  MOV ESI,vx1
+  SUB ESI,EAX
+  MOV EAX,vx1
+@pi8_w1:
+
+  CMP EBX,vy1
+  JGE @pi8_w2
+  PUSH EAX
+  PUSH EDX
+  MOV EAX,vy1
+  SUB EAX,EBX
+  MUL DWORD PTR [EDI+timage.bytesperline]
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EBX,vy1
+@pi8_w2:
+
+  CMP EDX,vx2
+  JLE @pi8_w3
+  MOV EDX,vx2
+@pi8_w3:
+
+  CMP ECX,vy2
+  JLE @pi8_w4
+  MOV ECX,vy2
+@pi8_w4:
+
+  SUB EDX,EAX
+  INC EDX
+  MOV EDI,[EDI+timage.bytesperline]
+  SUB EDI,EDX
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB8
+  POP EBX
+  POP EDX
+  XCHG EAX,EDI
+
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EBX,img
+  ADD ESI,[EBX+timage.pixeldata]
+
+  MOV EBX,bytperline
+  CLD
+@pi8_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV ECX,EDX
+  SHR ECX,2
+  REP MOVSD
+  MOV ECX,EDX
+  AND ECX,3
+  REP MOVSB
+  POP EDI
+  POP ECX
+
+  ADD ESI,EAX
+  ADD DI,BX
+  JC @pi8_weiter
+  DEC ECX
+  JNZ @pi8_loop
+  JMP @pi8_ende
+@pi8_weiter:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @pi8_loop
+@pi8_ende:
+END;
+
+PROCEDURE putimageB16(x,y:longint;img:pimage);assembler;
+ASM
+  MOV EDI,img
+  MOV EAX,x
+  MOV EBX,y
+  MOV EDX,EAX
+  ADD EDX,[EDI+timage.width]
+  DEC EDX
+  MOV ECX,EBX
+  ADD ECX,[EDI+timage.height]
+  DEC ECX
+
+  CMP EAX,vx2
+  JG @pi16_ende
+  CMP EBX,vy2
+  JG @pi16_ende
+  CMP EDX,vx1
+  JL @pi16_ende
+  CMP ECX,vy1
+  JL @pi16_ende
+
+  XOR ESI,ESI
+
+  CMP EAX,vx1
+  JGE @pi16_w1
+  MOV ESI,vx1
+  SUB ESI,EAX
+  SHL ESI,1
+  MOV EAX,vx1
+@pi16_w1:
+
+  CMP EBX,vy1
+  JGE @pi16_w2
+  PUSH EAX
+  PUSH EDX
+  MOV EAX,vy1
+  SUB EAX,EBX
+  MUL DWORD PTR [EDI+timage.bytesperline]
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EBX,vy1
+@pi16_w2:
+
+  CMP EDX,vx2
+  JLE @pi16_w3
+  MOV EDX,vx2
+@pi16_w3:
+
+  CMP ECX,vy2
+  JLE @pi16_w4
+  MOV ECX,vy2
+@pi16_w4:
+
+  SUB EDX,EAX
+  INC EDX
+  MOV EDI,[EDI+timage.bytesperline]
+  SUB EDI,EDX
+  SUB EDI,EDX
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB16
+  POP EBX
+  POP EDX
+  XCHG EAX,EDI
+
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EBX,img
+  ADD ESI,[EBX+timage.pixeldata]
+
+  MOV EBX,bytperline
+  CLD
+@pi16_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV ECX,EDX
+  SHR ECX,1
+  REP MOVSD
+  MOV ECX,EDX
+  AND ECX,1
+  REP MOVSW
+  POP EDI
+  POP ECX
+
+  ADD ESI,EAX
+  ADD DI,BX
+  JC @pi16_weiter
+  DEC ECX
+  JNZ @pi16_loop
+  JMP @pi16_ende
+@pi16_weiter:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @pi16_loop
+@pi16_ende:
+END;
+
+PROCEDURE putimageB24(x,y:longint;img:pimage);assembler;
+ASM
+  MOV EDI,img
+  MOV EAX,x
+  MOV EBX,y
+  MOV EDX,EAX
+  ADD EDX,[EDI+timage.width]
+  DEC EDX
+  MOV ECX,EBX
+  ADD ECX,[EDI+timage.height]
+  DEC ECX
+
+  CMP EAX,vx2
+  JG @pi24_ende
+  CMP EBX,vy2
+  JG @pi24_ende
+  CMP EDX,vx1
+  JL @pi24_ende
+  CMP ECX,vy1
+  JL @pi24_ende
+
+  XOR ESI,ESI
+
+  CMP EAX,vx1
+  JGE @pi24_w1
+  MOV ESI,vx1
+  SUB ESI,EAX
+  LEA ESI,[ESI+ESI*2]
+  MOV EAX,vx1
+@pi24_w1:
+
+  CMP EBX,vy1
+  JGE @pi24_w2
+  PUSH EAX
+  PUSH EDX
+  MOV EAX,vy1
+  SUB EAX,EBX
+  MUL DWORD PTR [EDI+timage.bytesperline]
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EBX,vy1
+@pi24_w2:
+
+  CMP EDX,vx2
+  JLE @pi24_w3
+  MOV EDX,vx2
+@pi24_w3:
+
+  CMP ECX,vy2
+  JLE @pi24_w4
+  MOV ECX,vy2
+@pi24_w4:
+
+  SUB EDX,EAX
+  INC EDX
+  MOV EDI,[EDI+timage.bytesperline]
+  SUB EDI,EDX
+  SUB EDI,EDX
+  SUB EDI,EDX
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB24
+  POP EBX
+  POP EDX
+  XCHG EAX,EDI
+
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EBX,img
+  ADD ESI,[EBX+timage.pixeldata]
+
+  MOV EBX,EDX
+  SHL EDX,1
+  ADD EDX,EBX
+
+  MOV EBX,bytperline
+  CLD
+@pi24_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV ECX,EDX
+  SHR ECX,2
+  REP MOVSD
+  MOV ECX,EDX
+  AND ECX,3
+  REP MOVSB
+  POP EDI
+  POP ECX
+
+  ADD ESI,EAX
+  ADD DI,BX
+  JC @pi24_weiter
+  DEC ECX
+  JNZ @pi24_loop
+  JMP @pi24_ende
+@pi24_weiter:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @pi24_loop
+@pi24_ende:
+END;
+
+PROCEDURE putimageB32(x,y:longint;img:pimage);assembler;
+ASM
+  MOV EDI,img
+  MOV EAX,x
+  MOV EBX,y
+  MOV EDX,EAX
+  ADD EDX,[EDI+timage.width]
+  DEC EDX
+  MOV ECX,EBX
+  ADD ECX,[EDI+timage.height]
+  DEC ECX
+
+  CMP EAX,vx2
+  JG @pi32_ende
+  CMP EBX,vy2
+  JG @pi32_ende
+  CMP EDX,vx1
+  JL @pi32_ende
+  CMP ECX,vy1
+  JL @pi32_ende
+
+  XOR ESI,ESI
+
+  CMP EAX,vx1
+  JGE @pi32_w1
+  ADD ESI,vx1
+  SUB ESI,EAX
+  SHL ESI,2
+  MOV EAX,vx1
+@pi32_w1:
+
+  CMP EBX,vy1
+  JGE @pi32_w2
+  PUSH EAX
+  PUSH EDX
+  MOV EAX,vy1
+  SUB EAX,EBX
+  MUL DWORD PTR [EDI+timage.bytesperline]
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EBX,vy1
+@pi32_w2:
+
+  CMP EDX,vx2
+  JLE @pi32_w3
+  MOV EDX,vx2
+@pi32_w3:
+
+  CMP ECX,vy2
+  JLE @pi32_w4
+  MOV ECX,vy2
+@pi32_w4:
+
+  SUB EDX,EAX
+  INC EDX
+  MOV EDI,[EDI+timage.bytesperline]
+  SHL EDX,2
+  SUB EDI,EDX
+  SHR EDX,2
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB32
+  POP EBX
+  POP EDX
+  XCHG EAX,EDI
+
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EBX,img
+  ADD ESI,[EBX+timage.pixeldata]
+
+  MOV EBX,bytperline
+  CLD
+@pi32_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV ECX,EDX
+  REP MOVSD
+  POP EDI
+  POP ECX
+
+  ADD ESI,EAX
+  ADD DI,BX
+  JC @pi32_weiter
+  DEC ECX
+  JNZ @pi32_loop
+  JMP @pi32_ende
+
+@pi32_weiter:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @pi32_loop
+@pi32_ende:
+END;
+
+{============================= putimageCB =================================}
+
+PROCEDURE putimageCB8(x,y:longint;img:pimage);assembler;
+VAR f:longint;
+ASM
+  MOV EDI,img
+  MOV EAX,[EDI+timage.transparencycolor]
+  MOV f,EAX
+  MOV EAX,x
+  MOV EBX,y
+  MOV EDX,EAX
+  ADD EDX,[EDI+timage.width]
+  DEC EDX
+  MOV ECX,EBX
+  ADD ECX,[EDI+timage.height]
+  DEC ECX
+
+  CMP EAX,vx2
+  JG @phg8_ende
+  CMP EBX,vy2
+  JG @phg8_ende
+  CMP EDX,vx1
+  JL @phg8_ende
+  CMP ECX,vy1
+  JL @phg8_ende
+
+  XOR ESI,ESI
+
+  CMP EAX,vx1
+  JGE @phg8_w1
+  ADD ESI,vx1
+  SUB ESI,EAX
+  MOV EAX,vx1
+@phg8_w1:
+
+  CMP EBX,vy1
+  JGE @phg8_w2
+  PUSH EAX
+  PUSH EDX
+  MOV EAX,vy1
+  SUB EAX,EBX
+  MUL DWORD PTR [EDI+timage.bytesperline]
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EBX,vy1
+@phg8_w2:
+
+  CMP EDX,vx2
+  JLE @phg8_w3
+  MOV EDX,vx2
+@phg8_w3:
+
+  CMP ECX,vy2
+  JLE @phg8_w4
+  MOV ECX,vy2
+@phg8_w4:
+
+  SUB EDX,EAX
+  INC EDX
+  MOV EDI,[EDI+timage.bytesperline]
+  SUB EDI,EDX
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB8
+  POP EBX
+  POP EDX
+  XCHG EAX,EDI
+
+  SUB ECX,EBX
+  INC ECX
+
+  MOV EBX,img
+  ADD ESI,[EBX+timage.pixeldata]
+
+  MOV EBX,f
+  CLD
+@phg8_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  PUSH EAX
+  MOV ECX,EDX
+  JMP @phg8_l1
+@phg8_keinpunkt:
+  INC EDI
+  DEC ECX
+  JZ @phg8_weiter
+@phg8_l1:
+  LODSB
+  CMP AL,BL
+  JE @phg8_keinpunkt
+  STOSB
+  DEC ECX
+  JNZ @phg8_l1
+@phg8_weiter:
+  POP EAX
+  POP EDI
+  POP ECX
+
+  ADD ESI,EAX
+  ADD DI,WORD PTR bytperline
+  JC @phg8_bankswitch
+  DEC ECX
+  JNZ @phg8_loop
+  JMP @phg8_ende
+@phg8_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @phg8_loop
+@phg8_ende:
+END;
+
+PROCEDURE putimageCB16(x,y:longint;img:pimage);assembler;
+VAR f:longint;
+ASM
+  MOV EDI,img
+  MOV EAX,[EDI+timage.transparencycolor]
+  MOV f,EAX
+  MOV EAX,x
+  MOV EBX,y
+  MOV EDX,EAX
+  ADD EDX,[EDI+timage.width]
+  DEC EDX
+  MOV ECX,EBX
+  ADD ECX,[EDI+timage.height]
+  DEC ECX
+
+  CMP EAX,vx2
+  JG @phg16_ende
+  CMP EBX,vy2
+  JG @phg16_ende
+  CMP EDX,vx1
+  JL @phg16_ende
+  CMP ECX,vy1
+  JL @phg16_ende
+
+  XOR ESI,ESI
+
+  CMP EAX,vx1
+  JGE @phg16_w1
+  ADD ESI,vx1
+  SUB ESI,EAX
+  SHL ESI,1
+  MOV EAX,vx1
+@phg16_w1:
+
+  CMP EBX,vy1
+  JGE @phg16_w2
+  PUSH EAX
+  PUSH EDX
+  MOV EAX,vy1
+  SUB EAX,EBX
+  MUL DWORD PTR [EDI+timage.bytesperline]
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EBX,vy1
+@phg16_w2:
+
+  CMP EDX,vx2
+  JLE @phg16_w3
+  MOV EDX,vx2
+@phg16_w3:
+
+  CMP ECX,vy2
+  JLE @phg16_w4
+  MOV ECX,vy2
+@phg16_w4:
+
+  SUB EDX,EAX
+  INC EDX
+  MOV EDI,[EDI+timage.bytesperline]
+  SUB EDI,EDX
+  SUB EDI,EDX
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB16
+  POP EBX
+  POP EDX
+  XCHG EAX,EDI
+
+  SUB ECX,EBX
+  INC ECX
+
+{  ADD ESI,imagedatastart
+  ADD ESI,img }
+  MOV EBX,img
+  ADD ESI,[EBX+timage.pixeldata]
+
+  MOV EBX,f
+  CLD
+@phg16_loop:
+  PUSH ECX
+  PUSH EDI
+  PUSH EAX
+  ADD EDI,VGAbase
+  MOV ECX,EDX
+  JMP @phg16_l1
+@phg16_keinpunkt:
+  ADD EDI,2
+  DEC ECX
+  JECXZ @phg16_weiter
+@phg16_l1:
+  LODSW
+  CMP AX,BX
+  JE @phg16_keinpunkt
+  STOSW
+  DEC ECX
+  JNZ @phg16_l1
+@phg16_weiter:
+  POP EAX
+  POP EDI
+  POP ECX
+
+  ADD ESI,EAX
+  ADD DI,WORD PTR bytperline
+  JC @phg16_bankswitch
+  DEC ECX
+  JNZ @phg16_loop
+  JMP @phg16_ende
+@phg16_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @phg16_loop
+@phg16_ende:
+END;
+
+PROCEDURE putimageCB24(x,y:longint;img:pimage);assembler;
+VAR f:longint;
+ASM
+  MOV EDI,img
+  MOV EAX,[EDI+timage.transparencycolor]
+  MOV f,EAX
+  MOV EAX,x
+  MOV EBX,y
+  MOV EDX,EAX
+  ADD EDX,[EDI+timage.width]
+  DEC EDX
+  MOV ECX,EBX
+  ADD ECX,[EDI+timage.height]
+  DEC ECX
+
+  CMP EAX,vx2
+  JG @phg24_ende
+  CMP EBX,vy2
+  JG @phg24_ende
+  CMP EDX,vx1
+  JL @phg24_ende
+  CMP ECX,vy1
+  JL @phg24_ende
+
+  XOR ESI,ESI
+
+  CMP EAX,vx1
+  JGE @phg24_w1
+  ADD ESI,vx1
+  SUB ESI,EAX
+  LEA ESI,[ESI+ESI*2]
+  MOV EAX,vx1
+@phg24_w1:
+
+  CMP EBX,vy1
+  JGE @phg24_w2
+  PUSH EAX
+  PUSH EDX
+  MOV EAX,vy1
+  SUB EAX,EBX
+  MUL DWORD PTR [EDI+timage.bytesperline]
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EBX,vy1
+@phg24_w2:
+
+  CMP EDX,vx2
+  JLE @phg24_w3
+  MOV EDX,vx2
+@phg24_w3:
+
+  CMP ECX,vy2
+  JLE @phg24_w4
+  MOV ECX,vy2
+@phg24_w4:
+
+  SUB EDX,EAX
+  INC EDX
+  MOV EDI,[EDI+timage.bytesperline]
+  SUB EDI,EDX
+  SUB EDI,EDX
+  SUB EDI,EDX
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB24
+  POP EBX
+  POP EDX
+  XCHG EAX,EDI
+
+  SUB ECX,EBX
+  INC ECX
+
+{  ADD ESI,imagedatastart
+  ADD ESI,img }
+  MOV EBX,img
+  ADD ESI,[EBX+timage.pixeldata]
+
+
+  MOV EBX,f
+  CLD
+@phg24_loop:
+  PUSH ECX
+  PUSH EDI
+  PUSH EAX
+  ADD EDI,VGAbase
+  MOV ECX,EDX
+  JMP @phg24_l1
+@phg24_keinpunkt:
+  ADD EDI,3
+  DEC ECX
+  JECXZ @phg24_weiter
+@phg24_l1:
+  LODSW
+  SHL EAX,16
+  LODSB
+  ROL EAX,16
+
+  CMP EAX,EBX
+  JE @phg24_keinpunkt
+  STOSW
+  SHR EAX,16
+  STOSB
+  DEC ECX
+  JNZ @phg24_l1
+@phg24_weiter:
+
+  POP EAX
+  POP EDI
+  POP ECX
+
+  ADD ESI,EAX
+  ADD DI,WORD PTR bytperline
+  JC @phg24_bankswitch
+  DEC ECX
+  JNZ @phg24_loop
+  JMP @phg24_ende
+@phg24_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @phg24_loop
+@phg24_ende:
+END;
+
+PROCEDURE putimageCB32(x,y:longint;img:pimage);assembler;
+VAR f:longint;
+ASM
+  MOV EDI,img
+  MOV EAX,[EDI+timage.transparencycolor]
+  MOV f,EAX
+  MOV EAX,x
+  MOV EBX,y
+  MOV EDX,EAX
+  ADD EDX,[EDI+timage.width]
+  DEC EDX
+  MOV ECX,EBX
+  ADD ECX,[EDI+timage.height]
+  DEC ECX
+
+  CMP EAX,vx2
+  JG @phg32_ende
+  CMP EBX,vy2
+  JG @phg32_ende
+  CMP EDX,vx1
+  JL @phg32_ende
+  CMP ECX,vy1
+  JL @phg32_ende
+
+  XOR ESI,ESI
+
+  CMP EAX,vx1
+  JGE @phg32_w1
+  ADD ESI,vx1
+  SUB ESI,EAX
+  SHL ESI,2
+  MOV EAX,vx1
+@phg32_w1:
+
+  CMP EBX,vy1
+  JGE @phg32_w2
+  PUSH EAX
+  PUSH EDX
+  MOV EAX,vy1
+  SUB EAX,EBX
+  MUL DWORD PTR [EDI+timage.bytesperline]
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EBX,vy1
+@phg32_w2:
+
+  CMP EDX,vx2
+  JLE @phg32_w3
+  MOV EDX,vx2
+@phg32_w3:
+
+  CMP ECX,vy2
+  JLE @phg32_w4
+  MOV ECX,vy2
+@phg32_w4:
+
+  SUB EDX,EAX
+  INC EDX
+  MOV EDI,[EDI+timage.bytesperline]
+  SUB EDI,EDX
+  SUB EDI,EDX
+  SUB EDI,EDX
+  SUB EDI,EDX
+
+  PUSH EDX
+  PUSH EBX
+  PUSH EBX
+  PUSH EAX
+  CALL pixofsB32
+  POP EBX
+  POP EDX
+  XCHG EAX,EDI
+
+  SUB ECX,EBX
+  INC ECX
+
+{  ADD ESI,imagedatastart
+  ADD ESI,img }
+  MOV EBX,img
+  ADD ESI,[EBX+timage.pixeldata]
+
+  MOV EBX,f
+  CLD
+@phg32_loop:
+  PUSH ECX
+  PUSH EDI
+  PUSH EAX
+  ADD EDI,VGAbase
+  MOV ECX,EDX
+
+  JMP @phg32_l1
+@phg32_keinpunkt:
+  ADD EDI,4
+  DEC ECX
+  JECXZ @phg32_weiter
+@phg32_l1:
+  LODSD
+  CMP EAX,EBX
+  JE @phg32_keinpunkt
+  STOSD
+  DEC ECX
+  JNZ @phg32_l1
+@phg32_weiter:
+  POP EAX
+  POP EDI
+  POP ECX
+
+  ADD ESI,EAX
+  ADD DI,WORD PTR bytperline
+  JC @phg32_bankswitch
+  DEC ECX
+  JNZ @phg32_loop
+  JMP @phg32_ende
+@phg32_bankswitch:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @phg32_loop
+@phg32_ende:
+END;
+
+{============================= putimagepartB ===============================}
+
+PROCEDURE putimagepartB8(x,y,xi1,yi1,xi2,yi2:longint;img:pimage);assembler;
+VAR imgxdl:longint;
+ASM
+  MOV EAX,xi1
+  MOV EBX,xi2
+  CMP EAX,EBX
+  JLE @pipB8_w01
+  XCHG EAX,EBX
+@pipB8_w01:
+  MOV xi1,EAX
+  MOV xi2,EBX
+
+  MOV EAX,yi1
+  MOV EBX,yi2
+  CMP EAX,EBX
+  JLE @pipB8_w02
+  XCHG EAX,EBX
+@pipB8_w02:
+  MOV yi1,EAX
+  MOV yi2,EBX
+
+  MOV ESI,img
+  MOV EAX,[ESI+timage.width]
+  MOV EBX,[ESI+timage.height]
+  MOV ECX,[ESI+timage.bytesperline]
+  DEC EAX
+  DEC EBX
+  MOV imgxdl,ECX
+
+  CMP xi1,EAX
+  JG @pipB8_ende
+  CMP yi1,EBX
+  JG @pipB8_ende
+  CMP xi2,0
+  JL @pipB8_ende
+  CMP yi2,0
+  JL @pipB8_ende
+
+  CMP xi1,0
+  JGE @pipB8_w03
+  MOV xi1,0
+@pipB8_w03:
+  CMP yi1,0
+  JGE @pipB8_w04
+  MOV yi1,0
+@pipB8_w04:
+  CMP xi2,EAX
+  JLE @pipB8_w05
+  MOV xi2,EAX
+@pipB8_w05:
+  CMP yi2,EBX
+  JLE @pipB8_w06
+  MOV yi2,EBX
+@pipB8_w06:
+
+  MOV EDI,x
+  MOV EAX,y
+  MOV EBX,EDI
+  MOV ECX,EAX
+
+  ADD EBX,xi2
+  ADD ECX,yi2
+  SUB EBX,xi1
+  SUB ECX,yi1
+
+  CMP EDI,vx2
+  JG @pipB8_ende
+  CMP EAX,vy2
+  JG @pipB8_ende
+  CMP EBX,vx1
+  JL @pipB8_ende
+  CMP ECX,vy1
+  JL @pipB8_ende
+
+  CMP EDI,vx1
+  JGE @pipB8_w13
+  MOV EDI,vx1
+@pipB8_w13:
+  CMP EAX,vy1
+  JGE @pipB8_w14
+  MOV EAX,vy1
+@pipB8_w14:
+  CMP EBX,vx2
+  JLE @pipB8_w15
+  MOV EBX,vx2
+@pipB8_w15:
+  CMP ECX,vy2
+  JLE @pipB8_w16
+  MOV ECX,vy2
+@pipB8_w16:
+
+  PUSH EAX
+  MOV ESI,EDI
+  SUB ESI,x
+  SUB EAX,y
+  ADD ESI,xi1
+  ADD EAX,yi1
+  MUL imgxdl
+  ADD ESI,EAX
+  POP EAX
+
+  SUB EBX,EDI
+  SUB ECX,EAX
+  INC EBX
+  INC ECX
+
+  PUSH EBX
+  PUSH EAX
+  PUSH EDI
+  CALL pixofsB8
+  MOV EDI,EAX
+  POP EBX
+
+{  ADD ESI,imagedatastart
+  ADD ESI,img }
+  MOV EDX,img
+  ADD ESI,[EDX+timage.pixeldata]
+
+
+  MOV EDX,bytperline
+  MOV EAX,EBX
+  NEG EAX
+  ADD EAX,imgxdl
+  CLD
+@pipB8_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV ECX,EBX
+  SHR ECX,2
+  REP MOVSD
+  MOV ECX,EBX
+  AND ECX,3
+  REP MOVSB
+  POP EDI
+  POP ECX
+
+  ADD ESI,EAX
+  ADD DI,DX
+  JC @pipB8_weiter
+  DEC ECX
+  JNZ @pipB8_loop
+  JMP @pipB8_ende
+@pipB8_weiter:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @pipB8_loop
+@pipB8_ende:
+END;
+
+PROCEDURE putimagepartB16(x,y,xi1,yi1,xi2,yi2:longint;img:pimage);assembler;
+VAR imgxdl:longint;
+ASM
+  MOV EAX,xi1
+  MOV EBX,xi2
+  CMP EAX,EBX
+  JLE @pipB16_w01
+  XCHG EAX,EBX
+@pipB16_w01:
+  MOV xi1,EAX
+  MOV xi2,EBX
+
+  MOV EAX,yi1
+  MOV EBX,yi2
+  CMP EAX,EBX
+  JLE @pipB16_w02
+  XCHG EAX,EBX
+@pipB16_w02:
+  MOV yi1,EAX
+  MOV yi2,EBX
+
+  MOV ESI,img
+  MOV EAX,[ESI+timage.width]
+  MOV EBX,[ESI+timage.height]
+  MOV ECX,[ESI+timage.bytesperline]
+  DEC EAX
+  DEC EBX
+  MOV imgxdl,ECX
+
+  CMP xi1,EAX
+  JG @pipB16_ende
+  CMP yi1,EBX
+  JG @pipB16_ende
+  CMP xi2,0
+  JL @pipB16_ende
+  CMP yi2,0
+  JL @pipB16_ende
+
+  CMP xi1,0
+  JGE @pipB16_w03
+  MOV xi1,0
+@pipB16_w03:
+  CMP yi1,0
+  JGE @pipB16_w04
+  MOV yi1,0
+@pipB16_w04:
+  CMP xi2,EAX
+  JLE @pipB16_w05
+  MOV xi2,EAX
+@pipB16_w05:
+  CMP yi2,EBX
+  JLE @pipB16_w06
+  MOV yi2,EBX
+@pipB16_w06:
+
+  MOV EDI,x
+  MOV EAX,y
+  MOV EBX,EDI
+  MOV ECX,EAX
+
+  ADD EBX,xi2
+  ADD ECX,yi2
+  SUB EBX,xi1
+  SUB ECX,yi1
+
+  CMP EDI,vx2
+  JG @pipB16_ende
+  CMP EAX,vy2
+  JG @pipB16_ende
+  CMP EBX,vx1
+  JL @pipB16_ende
+  CMP ECX,vy1
+  JL @pipB16_ende
+
+  CMP EDI,vx1
+  JGE @pipB16_w13
+  MOV EDI,vx1
+@pipB16_w13:
+  CMP EAX,vy1
+  JGE @pipB16_w14
+  MOV EAX,vy1
+@pipB16_w14:
+  CMP EBX,vx2
+  JLE @pipB16_w15
+  MOV EBX,vx2
+@pipB16_w15:
+  CMP ECX,vy2
+  JLE @pipB16_w16
+  MOV ECX,vy2
+@pipB16_w16:
+
+  PUSH EAX
+  MOV ESI,EDI
+  SUB ESI,x
+  SUB EAX,y
+  ADD ESI,xi1
+  ADD EAX,yi1
+  SHL ESI,1
+  MUL imgxdl
+  ADD ESI,EAX
+  POP EAX
+
+  SUB EBX,EDI
+  SUB ECX,EAX
+  INC EBX
+  INC ECX
+
+  PUSH EBX
+  PUSH EAX
+  PUSH EDI
+  CALL pixofsB16
+  MOV EDI,EAX
+  POP EBX
+
+{  ADD ESI,imagedatastart
+  ADD ESI,img }
+  MOV EDX,img
+  ADD ESI,[EDX+timage.pixeldata]
+
+  MOV EDX,bytperline
+  LEA EAX,[EBX*2]
+  NEG EAX
+  ADD EAX,imgxdl
+  CLD
+@pipB16_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV ECX,EBX
+  SHR ECX,1
+  REP MOVSD
+  MOV ECX,EBX
+  AND ECX,1
+  REP MOVSW
+  POP EDI
+  POP ECX
+
+  ADD ESI,EAX
+  ADD DI,DX
+  JC @pipB16_weiter
+  DEC ECX
+  JNZ @pipB16_loop
+  JMP @pipB16_ende
+@pipB16_weiter:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @pipB16_loop
+@pipB16_ende:
+END;
+
+PROCEDURE putimagepartB24(x,y,xi1,yi1,xi2,yi2:longint;img:pimage);assembler;
+VAR imgxdl:longint;
+ASM
+  MOV EAX,xi1
+  MOV EBX,xi2
+  CMP EAX,EBX
+  JLE @pipB24_w01
+  XCHG EAX,EBX
+@pipB24_w01:
+  MOV xi1,EAX
+  MOV xi2,EBX
+
+  MOV EAX,yi1
+  MOV EBX,yi2
+  CMP EAX,EBX
+  JLE @pipB24_w02
+  XCHG EAX,EBX
+@pipB24_w02:
+  MOV yi1,EAX
+  MOV yi2,EBX
+
+  MOV ESI,img
+  MOV EAX,[ESI+timage.width]
+  MOV EBX,[ESI+timage.height]
+  MOV ECX,[ESI+timage.bytesperline]
+  DEC EAX
+  DEC EBX
+  MOV imgxdl,ECX
+
+  CMP xi1,EAX
+  JG @pipB24_ende
+  CMP yi1,EBX
+  JG @pipB24_ende
+  CMP xi2,0
+  JL @pipB24_ende
+  CMP yi2,0
+  JL @pipB24_ende
+
+  CMP xi1,0
+  JGE @pipB24_w03
+  MOV xi1,0
+@pipB24_w03:
+  CMP yi1,0
+  JGE @pipB24_w04
+  MOV yi1,0
+@pipB24_w04:
+  CMP xi2,EAX
+  JLE @pipB24_w05
+  MOV xi2,EAX
+@pipB24_w05:
+  CMP yi2,EBX
+  JLE @pipB24_w06
+  MOV yi2,EBX
+@pipB24_w06:
+
+  MOV EDI,x
+  MOV EAX,y
+  MOV EBX,EDI
+  MOV ECX,EAX
+
+  ADD EBX,xi2
+  ADD ECX,yi2
+  SUB EBX,xi1
+  SUB ECX,yi1
+
+  CMP EDI,vx2
+  JG @pipB24_ende
+  CMP EAX,vy2
+  JG @pipB24_ende
+  CMP EBX,vx1
+  JL @pipB24_ende
+  CMP ECX,vy1
+  JL @pipB24_ende
+
+  CMP EDI,vx1
+  JGE @pipB24_w13
+  MOV EDI,vx1
+@pipB24_w13:
+  CMP EAX,vy1
+  JGE @pipB24_w14
+  MOV EAX,vy1
+@pipB24_w14:
+  CMP EBX,vx2
+  JLE @pipB24_w15
+  MOV EBX,vx2
+@pipB24_w15:
+  CMP ECX,vy2
+  JLE @pipB24_w16
+  MOV ECX,vy2
+@pipB24_w16:
+
+  PUSH EAX
+  MOV ESI,EDI
+  SUB ESI,x
+  SUB EAX,y
+  ADD ESI,xi1
+  ADD EAX,yi1
+  LEA ESI,[ESI+ESI*2]
+  MUL imgxdl
+  ADD ESI,EAX
+  POP EAX
+
+  SUB EBX,EDI
+  SUB ECX,EAX
+  INC EBX
+  INC ECX
+
+  PUSH EBX
+  PUSH EAX
+  PUSH EDI
+  CALL pixofsB24
+  MOV EDI,EAX
+  POP EBX
+
+{  ADD ESI,imagedatastart
+  ADD ESI,img }
+  MOV EDX,img
+  ADD ESI,[EDX+timage.pixeldata]
+
+  LEA EBX,[EBX+EBX*2]
+  MOV EDX,bytperline
+  MOV EAX,EBX
+  NEG EAX
+  ADD EAX,imgxdl
+  CLD
+@pipB24_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV ECX,EBX
+  SHR ECX,2
+  REP MOVSD
+  MOV ECX,EBX
+  AND ECX,3
+  REP MOVSB
+  POP EDI
+  POP ECX
+
+  ADD ESI,EAX
+  ADD DI,DX
+  JC @pipB24_weiter
+  DEC ECX
+  JNZ @pipB24_loop
+  JMP @pipB24_ende
+@pipB24_weiter:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @pipB24_loop
+@pipB24_ende:
+END;
+
+PROCEDURE putimagepartB32(x,y,xi1,yi1,xi2,yi2:longint;img:pimage);assembler;
+VAR imgxdl:longint;
+ASM
+  MOV EAX,xi1
+  MOV EBX,xi2
+  CMP EAX,EBX
+  JLE @pipB32_w01
+  XCHG EAX,EBX
+@pipB32_w01:
+  MOV xi1,EAX
+  MOV xi2,EBX
+
+  MOV EAX,yi1
+  MOV EBX,yi2
+  CMP EAX,EBX
+  JLE @pipB32_w02
+  XCHG EAX,EBX
+@pipB32_w02:
+  MOV yi1,EAX
+  MOV yi2,EBX
+
+  MOV ESI,img
+  MOV EAX,[ESI+timage.width]
+  MOV EBX,[ESI+timage.height]
+  MOV ECX,[ESI+timage.bytesperline]
+  DEC EAX
+  DEC EBX
+  MOV imgxdl,ECX
+
+  CMP xi1,EAX
+  JG @pipB32_ende
+  CMP yi1,EBX
+  JG @pipB32_ende
+  CMP xi2,0
+  JL @pipB32_ende
+  CMP yi2,0
+  JL @pipB32_ende
+
+  CMP xi1,0
+  JGE @pipB32_w03
+  MOV xi1,0
+@pipB32_w03:
+  CMP yi1,0
+  JGE @pipB32_w04
+  MOV yi1,0
+@pipB32_w04:
+  CMP xi2,EAX
+  JLE @pipB32_w05
+  MOV xi2,EAX
+@pipB32_w05:
+  CMP yi2,EBX
+  JLE @pipB32_w06
+  MOV yi2,EBX
+@pipB32_w06:
+
+  MOV EDI,x
+  MOV EAX,y
+  MOV EBX,EDI
+  MOV ECX,EAX
+
+  ADD EBX,xi2
+  ADD ECX,yi2
+  SUB EBX,xi1
+  SUB ECX,yi1
+
+  CMP EDI,vx2
+  JG @pipB32_ende
+  CMP EAX,vy2
+  JG @pipB32_ende
+  CMP EBX,vx1
+  JL @pipB32_ende
+  CMP ECX,vy1
+  JL @pipB32_ende
+
+  CMP EDI,vx1
+  JGE @pipB32_w13
+  MOV EDI,vx1
+@pipB32_w13:
+  CMP EAX,vy1
+  JGE @pipB32_w14
+  MOV EAX,vy1
+@pipB32_w14:
+  CMP EBX,vx2
+  JLE @pipB32_w15
+  MOV EBX,vx2
+@pipB32_w15:
+  CMP ECX,vy2
+  JLE @pipB32_w16
+  MOV ECX,vy2
+@pipB32_w16:
+
+  PUSH EAX
+  MOV ESI,EDI
+  SUB ESI,x
+  SUB EAX,y
+  ADD ESI,xi1
+  ADD EAX,yi1
+  SHL ESI,2
+  MUL imgxdl
+  ADD ESI,EAX
+  POP EAX
+
+  SUB EBX,EDI
+  SUB ECX,EAX
+  INC EBX
+  INC ECX
+
+  PUSH EBX
+  PUSH EAX
+  PUSH EDI
+  CALL pixofsB32
+  MOV EDI,EAX
+  POP EBX
+
+{  ADD ESI,imagedatastart
+   ADD ESI,img }
+  MOV EDX,img
+  ADD ESI,[EDX+timage.pixeldata]
+
+  MOV EDX,bytperline
+  LEA EAX,[EBX*4]
+  NEG EAX
+  ADD EAX,imgxdl
+  CLD
+@pipB32_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV ECX,EBX
+  REP MOVSD
+  POP EDI
+  POP ECX
+
+  ADD ESI,EAX
+  ADD DI,DX
+  JC @pipB32_weiter
+  DEC ECX
+  JNZ @pipB32_loop
+  JMP @pipB32_ende
+
+@pipB32_weiter:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @pipB32_loop
+@pipB32_ende:
+END;
+
+{============================= putimagepartCB ===============================}
+
+PROCEDURE putimagepartCB8(x,y,xi1,yi1,xi2,yi2:longint;img:pimage);assembler;
+VAR imgxdl,f:longint;
+ASM
+  MOV EAX,xi1
+  MOV EBX,xi2
+  CMP EAX,EBX
+  JLE @pipcB8_w01
+  XCHG EAX,EBX
+@pipcB8_w01:
+  MOV xi1,EAX
+  MOV xi2,EBX
+
+  MOV EAX,yi1
+  MOV EBX,yi2
+  CMP EAX,EBX
+  JLE @pipcB8_w02
+  XCHG EAX,EBX
+@pipcB8_w02:
+  MOV yi1,EAX
+  MOV yi2,EBX
+
+  MOV ESI,img
+  MOV EAX,[ESI+timage.transparencycolor]
+  MOV f,EAX
+  MOV EAX,[ESI+timage.width]
+  MOV EBX,[ESI+timage.height]
+  MOV ECX,[ESI+timage.bytesperline]
+  DEC EAX
+  DEC EBX
+  MOV imgxdl,ECX
+
+  CMP xi1,EAX
+  JG @pipcB8_ende
+  CMP yi1,EBX
+  JG @pipcB8_ende
+  CMP xi2,0
+  JL @pipcB8_ende
+  CMP yi2,0
+  JL @pipcB8_ende
+
+  CMP xi1,0
+  JGE @pipcB8_w03
+  MOV xi1,0
+@pipcB8_w03:
+  CMP yi1,0
+  JGE @pipcB8_w04
+  MOV yi1,0
+@pipcB8_w04:
+  CMP xi2,EAX
+  JLE @pipcB8_w05
+  MOV xi2,EAX
+@pipcB8_w05:
+  CMP yi2,EBX
+  JLE @pipcB8_w06
+  MOV yi2,EBX
+@pipcB8_w06:
+
+  MOV EDI,x
+  MOV EAX,y
+  MOV EBX,EDI
+  MOV ECX,EAX
+
+  ADD EBX,xi2
+  ADD ECX,yi2
+  SUB EBX,xi1
+  SUB ECX,yi1
+
+  CMP EDI,vx2
+  JG @pipcB8_ende
+  CMP EAX,vy2
+  JG @pipcB8_ende
+  CMP EBX,vx1
+  JL @pipcB8_ende
+  CMP ECX,vy1
+  JL @pipcB8_ende
+
+  CMP EDI,vx1
+  JGE @pipcB8_w13
+  MOV EDI,vx1
+@pipcB8_w13:
+  CMP EAX,vy1
+  JGE @pipcB8_w14
+  MOV EAX,vy1
+@pipcB8_w14:
+  CMP EBX,vx2
+  JLE @pipcB8_w15
+  MOV EBX,vx2
+@pipcB8_w15:
+  CMP ECX,vy2
+  JLE @pipcB8_w16
+  MOV ECX,vy2
+@pipcB8_w16:
+
+  PUSH EAX
+  MOV ESI,EDI
+  SUB ESI,x
+  SUB EAX,y
+  ADD ESI,xi1
+  ADD EAX,yi1
+  MUL imgxdl
+  ADD ESI,EAX
+  POP EAX
+
+  SUB EBX,EDI
+  SUB ECX,EAX
+  INC EBX
+  INC ECX
+
+  PUSH EBX
+  PUSH EAX
+  PUSH EDI
+  CALL pixofsB8
+  MOV EDI,EAX
+  POP EBX
+
+{  ADD ESI,imagedatastart
+  ADD ESI,img }
+  MOV EDX,img
+  ADD ESI,[EDX+timage.pixeldata]
+
+
+  MOV EDX,bytperline
+  MOV EAX,EBX
+  NEG EAX
+  ADD EAX,imgxdl
+  CLD
+@pipcB8_loop:
+  PUSH ECX
+  PUSH EDI
+  ADD EDI,VGAbase
+  PUSH EAX
+  MOV ECX,EBX
+  JMP @pipc8_l1
+@pipc8_keinpunkt:
+  INC EDI
+  DEC ECX
+  JZ @pipc8_weiter
+@pipc8_l1:
+  LODSB
+  CMP AL,BYTE PTR f
+  JE @pipc8_keinpunkt
+  STOSB
+  DEC ECX
+  JNZ @pipc8_l1
+@pipc8_weiter:
+  POP EAX
+  POP EDI
+  POP ECX
+
+  ADD ESI,EAX
+  ADD DI,DX
+  JC @pipcB8_weiter
+  DEC ECX
+  JNZ @pipcB8_loop
+  JMP @pipcB8_ende
+@pipcB8_weiter:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @pipcB8_loop
+@pipcB8_ende:
+END;
+
+PROCEDURE putimagepartCB16(x,y,xi1,yi1,xi2,yi2:longint;img:pimage);assembler;
+VAR imgxdl,f:longint;
+ASM
+  MOV EAX,xi1
+  MOV EBX,xi2
+  CMP EAX,EBX
+  JLE @pipcB16_w01
+  XCHG EAX,EBX
+@pipcB16_w01:
+  MOV xi1,EAX
+  MOV xi2,EBX
+
+  MOV EAX,yi1
+  MOV EBX,yi2
+  CMP EAX,EBX
+  JLE @pipcB16_w02
+  XCHG EAX,EBX
+@pipcB16_w02:
+  MOV yi1,EAX
+  MOV yi2,EBX
+
+  MOV ESI,img
+  MOV EAX,[ESI+timage.transparencycolor]
+  MOV f,EAX
+  MOV EAX,[ESI+timage.width]
+  MOV EBX,[ESI+timage.height]
+  MOV ECX,[ESI+timage.bytesperline]
+  DEC EAX
+  DEC EBX
+  MOV imgxdl,ECX
+
+  CMP xi1,EAX
+  JG @pipcB16_ende
+  CMP yi1,EBX
+  JG @pipcB16_ende
+  CMP xi2,0
+  JL @pipcB16_ende
+  CMP yi2,0
+  JL @pipcB16_ende
+
+  CMP xi1,0
+  JGE @pipcB16_w03
+  MOV xi1,0
+@pipcB16_w03:
+  CMP yi1,0
+  JGE @pipcB16_w04
+  MOV yi1,0
+@pipcB16_w04:
+  CMP xi2,EAX
+  JLE @pipcB16_w05
+  MOV xi2,EAX
+@pipcB16_w05:
+  CMP yi2,EBX
+  JLE @pipcB16_w06
+  MOV yi2,EBX
+@pipcB16_w06:
+
+  MOV EDI,x
+  MOV EAX,y
+  MOV EBX,EDI
+  MOV ECX,EAX
+
+  ADD EBX,xi2
+  ADD ECX,yi2
+  SUB EBX,xi1
+  SUB ECX,yi1
+
+  CMP EDI,vx2
+  JG @pipcB16_ende
+  CMP EAX,vy2
+  JG @pipcB16_ende
+  CMP EBX,vx1
+  JL @pipcB16_ende
+  CMP ECX,vy1
+  JL @pipcB16_ende
+
+  CMP EDI,vx1
+  JGE @pipcB16_w13
+  MOV EDI,vx1
+@pipcB16_w13:
+  CMP EAX,vy1
+  JGE @pipcB16_w14
+  MOV EAX,vy1
+@pipcB16_w14:
+  CMP EBX,vx2
+  JLE @pipcB16_w15
+  MOV EBX,vx2
+@pipcB16_w15:
+  CMP ECX,vy2
+  JLE @pipcB16_w16
+  MOV ECX,vy2
+@pipcB16_w16:
+
+  PUSH EAX
+  MOV ESI,EDI
+  SUB ESI,x
+  SUB EAX,y
+  ADD ESI,xi1
+  ADD EAX,yi1
+  SHL ESI,1
+  MUL imgxdl
+  ADD ESI,EAX
+  POP EAX
+
+  SUB EBX,EDI
+  SUB ECX,EAX
+  INC EBX
+  INC ECX
+
+  PUSH EBX
+  PUSH EAX
+  PUSH EDI
+  CALL pixofsB16
+  MOV EDI,EAX
+  POP EBX
+
+{  ADD ESI,imagedatastart
+  ADD ESI,img }
+  MOV EDX,img
+  ADD ESI,[EDX+timage.pixeldata]
+
+  MOV EDX,bytperline
+  LEA EAX,[EBX*2]
+  NEG EAX
+  ADD EAX,imgxdl
+  CLD
+@pipcB16_loop:
+  PUSH ECX
+  PUSH EDI
+  PUSH EAX
+  ADD EDI,VGAbase
+  MOV ECX,EBX
+  JMP @pipc16_l1
+@pipc16_keinpunkt:
+  ADD EDI,2
+  DEC ECX
+  JECXZ @pipc16_weiter
+@pipc16_l1:
+  LODSW
+  CMP AX,WORD PTR f
+  JE @pipc16_keinpunkt
+  STOSW
+  DEC ECX
+  JNZ @pipc16_l1
+@pipc16_weiter:
+  POP EAX
+  POP EDI
+  POP ECX
+
+  ADD ESI,EAX
+  ADD DI,DX
+  JC @pipcB16_weiter
+  DEC ECX
+  JNZ @pipcB16_loop
+  JMP @pipcB16_ende
+@pipcB16_weiter:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @pipcB16_loop
+@pipcB16_ende:
+END;
+
+PROCEDURE putimagepartCB24(x,y,xi1,yi1,xi2,yi2:longint;img:pimage);assembler;
+VAR imgxdl,f:longint;
+ASM
+  MOV EAX,xi1
+  MOV EBX,xi2
+  CMP EAX,EBX
+  JLE @pipcB24_w01
+  XCHG EAX,EBX
+@pipcB24_w01:
+  MOV xi1,EAX
+  MOV xi2,EBX
+
+  MOV EAX,yi1
+  MOV EBX,yi2
+  CMP EAX,EBX
+  JLE @pipcB24_w02
+  XCHG EAX,EBX
+@pipcB24_w02:
+  MOV yi1,EAX
+  MOV yi2,EBX
+
+  MOV ESI,img
+  MOV EAX,[ESI+timage.transparencycolor]
+  MOV f,EAX
+  MOV EAX,[ESI+timage.width]
+  MOV EBX,[ESI+timage.height]
+  MOV ECX,[ESI+timage.bytesperline]
+  DEC EAX
+  DEC EBX
+  MOV imgxdl,ECX
+
+  CMP xi1,EAX
+  JG @pipcB24_ende
+  CMP yi1,EBX
+  JG @pipcB24_ende
+  CMP xi2,0
+  JL @pipcB24_ende
+  CMP yi2,0
+  JL @pipcB24_ende
+
+  CMP xi1,0
+  JGE @pipcB24_w03
+  MOV xi1,0
+@pipcB24_w03:
+  CMP yi1,0
+  JGE @pipcB24_w04
+  MOV yi1,0
+@pipcB24_w04:
+  CMP xi2,EAX
+  JLE @pipcB24_w05
+  MOV xi2,EAX
+@pipcB24_w05:
+  CMP yi2,EBX
+  JLE @pipcB24_w06
+  MOV yi2,EBX
+@pipcB24_w06:
+
+  MOV EDI,x
+  MOV EAX,y
+  MOV EBX,EDI
+  MOV ECX,EAX
+
+  ADD EBX,xi2
+  ADD ECX,yi2
+  SUB EBX,xi1
+  SUB ECX,yi1
+
+  CMP EDI,vx2
+  JG @pipcB24_ende
+  CMP EAX,vy2
+  JG @pipcB24_ende
+  CMP EBX,vx1
+  JL @pipcB24_ende
+  CMP ECX,vy1
+  JL @pipcB24_ende
+
+  CMP EDI,vx1
+  JGE @pipcB24_w13
+  MOV EDI,vx1
+@pipcB24_w13:
+  CMP EAX,vy1
+  JGE @pipcB24_w14
+  MOV EAX,vy1
+@pipcB24_w14:
+  CMP EBX,vx2
+  JLE @pipcB24_w15
+  MOV EBX,vx2
+@pipcB24_w15:
+  CMP ECX,vy2
+  JLE @pipcB24_w16
+  MOV ECX,vy2
+@pipcB24_w16:
+
+  PUSH EAX
+  MOV ESI,EDI
+  SUB ESI,x
+  SUB EAX,y
+  ADD ESI,xi1
+  ADD EAX,yi1
+  LEA ESI,[ESI+ESI*2]
+  MUL imgxdl
+  ADD ESI,EAX
+  POP EAX
+
+  SUB EBX,EDI
+  SUB ECX,EAX
+  INC EBX
+  INC ECX
+
+  PUSH EBX
+  PUSH EAX
+  PUSH EDI
+  CALL pixofsB24
+  MOV EDI,EAX
+  POP EBX
+
+{  ADD ESI,imagedatastart
+  ADD ESI,img }
+
+  MOV EDX,img
+  ADD ESI,[EDX+timage.pixeldata]
+
+  PUSH EBX
+  LEA EBX,[EBX+EBX*2]
+  MOV EDX,bytperline
+  MOV EAX,EBX
+  NEG EAX
+  ADD EAX,imgxdl
+  POP EBX
+  CLD
+@pipcB24_loop:
+  PUSH ECX
+  PUSH EDI
+  PUSH EAX
+  ADD EDI,VGAbase
+  MOV ECX,EBX
+  JMP @pipc24_l1
+@pipc24_keinpunkt:
+  ADD EDI,3
+  DEC ECX
+  JECXZ @pipc24_weiter
+@pipc24_l1:
+  LODSW
+  SHL EAX,16
+  LODSB
+  ROL EAX,16
+
+  CMP EAX,f
+  JE @pipc24_keinpunkt
+  STOSW
+  SHR EAX,16
+  STOSB
+  DEC ECX
+  JNZ @pipc24_l1
+@pipc24_weiter:
+
+  POP EAX
+  POP EDI
+  POP ECX
+
+  ADD ESI,EAX
+  ADD DI,DX
+  JC @pipcB24_weiter
+  DEC ECX
+  JNZ @pipcB24_loop
+  JMP @pipcB24_ende
+@pipcB24_weiter:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @pipcB24_loop
+@pipcB24_ende:
+END;
+
+PROCEDURE putimagepartCB32(x,y,xi1,yi1,xi2,yi2:longint;img:pimage);assembler;
+VAR imgxdl,f:longint;
+ASM
+  MOV EAX,xi1
+  MOV EBX,xi2
+  CMP EAX,EBX
+  JLE @pipcB32_w01
+  XCHG EAX,EBX
+@pipcB32_w01:
+  MOV xi1,EAX
+  MOV xi2,EBX
+
+  MOV EAX,yi1
+  MOV EBX,yi2
+  CMP EAX,EBX
+  JLE @pipcB32_w02
+  XCHG EAX,EBX
+@pipcB32_w02:
+  MOV yi1,EAX
+  MOV yi2,EBX
+
+  MOV ESI,img
+  MOV EAX,[ESI+timage.transparencycolor]
+  MOV f,EAX
+  MOV EAX,[ESI+timage.width]
+  MOV EBX,[ESI+timage.height]
+  MOV ECX,[ESI+timage.bytesperline]
+  DEC EAX
+  DEC EBX
+  MOV imgxdl,ECX
+
+  CMP xi1,EAX
+  JG @pipcB32_ende
+  CMP yi1,EBX
+  JG @pipcB32_ende
+  CMP xi2,0
+  JL @pipcB32_ende
+  CMP yi2,0
+  JL @pipcB32_ende
+
+  CMP xi1,0
+  JGE @pipcB32_w03
+  MOV xi1,0
+@pipcB32_w03:
+  CMP yi1,0
+  JGE @pipcB32_w04
+  MOV yi1,0
+@pipcB32_w04:
+  CMP xi2,EAX
+  JLE @pipcB32_w05
+  MOV xi2,EAX
+@pipcB32_w05:
+  CMP yi2,EBX
+  JLE @pipcB32_w06
+  MOV yi2,EBX
+@pipcB32_w06:
+
+  MOV EDI,x
+  MOV EAX,y
+  MOV EBX,EDI
+  MOV ECX,EAX
+
+  ADD EBX,xi2
+  ADD ECX,yi2
+  SUB EBX,xi1
+  SUB ECX,yi1
+
+  CMP EDI,vx2
+  JG @pipcB32_ende
+  CMP EAX,vy2
+  JG @pipcB32_ende
+  CMP EBX,vx1
+  JL @pipcB32_ende
+  CMP ECX,vy1
+  JL @pipcB32_ende
+
+  CMP EDI,vx1
+  JGE @pipcB32_w13
+  MOV EDI,vx1
+@pipcB32_w13:
+  CMP EAX,vy1
+  JGE @pipcB32_w14
+  MOV EAX,vy1
+@pipcB32_w14:
+  CMP EBX,vx2
+  JLE @pipcB32_w15
+  MOV EBX,vx2
+@pipcB32_w15:
+  CMP ECX,vy2
+  JLE @pipcB32_w16
+  MOV ECX,vy2
+@pipcB32_w16:
+
+  PUSH EAX
+  MOV ESI,EDI
+  SUB ESI,x
+  SUB EAX,y
+  ADD ESI,xi1
+  ADD EAX,yi1
+  SHL ESI,2
+  MUL imgxdl
+  ADD ESI,EAX
+  POP EAX
+
+  SUB EBX,EDI
+  SUB ECX,EAX
+  INC EBX
+  INC ECX
+
+  PUSH EBX
+  PUSH EAX
+  PUSH EDI
+  CALL pixofsB32
+  MOV EDI,EAX
+  POP EBX
+
+{  ADD ESI,imagedatastart
+  ADD ESI,img }
+  MOV EDX,img
+  ADD ESI,[EDX+timage.pixeldata]
+
+  MOV EDX,bytperline
+  LEA EAX,[EBX*4]
+  NEG EAX
+  ADD EAX,imgxdl
+  CLD
+@pipcB32_loop:
+  PUSH ECX
+  PUSH EDI
+  PUSH EAX
+  ADD EDI,VGAbase
+  MOV ECX,EBX
+
+  JMP @pipc32_l1
+@pipc32_keinpunkt:
+  ADD EDI,4
+  DEC ECX
+  JECXZ @pipc32_weiter
+@pipc32_l1:
+  LODSD
+  CMP EAX,f
+  JE @pipc32_keinpunkt
+  STOSD
+  DEC ECX
+  JNZ @pipc32_l1
+@pipc32_weiter:
+  POP EAX
+  POP EDI
+  POP ECX
+
+  ADD ESI,EAX
+  ADD DI,DX
+  JC @pipcB32_weiter
+  DEC ECX
+  JNZ @pipcB32_loop
+  JMP @pipcB32_ende
+
+@pipcB32_weiter:
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+  DEC ECX
+  JNZ @pipcB32_loop
+@pipcB32_ende:
+END;
+
+{============================= putbitmapB ===================================}
+
+PROCEDURE putbitmapB8(x,y,w,h,bpl,col:longint;var bitmap);assembler;
+VAR imgxdl:longint;
+ASM
+  MOV EAX,bpl
+  SHL EAX,3
+  MOV imgxdl,EAX
+  MOV EDI,x
+  MOV EAX,y
+  MOV EBX,EDI
+  ADD EBX,w
+  DEC EBX
+  MOV ECX,EAX
+  ADD ECX,h
+  DEC ECX
+
+  CMP EDI,vx2
+  JG @pbB_ende
+  CMP EAX,vy2
+  JG @pbB_ende
+  CMP EBX,vx1
+  JL @pbB_ende
+  CMP ECX,vy1
+  JL @pbB_ende
+
+  XOR ESI,ESI
+  CMP EDI,vx1
+  JGE @pbB_w1
+  SUB ESI,EDI
+  MOV EDI,vx1
+  ADD ESI,EDI
+@pbB_w1:
+
+  CMP EAX,vy1
+  JGE @pbB_w2
+  NEG EAX
+  ADD EAX,vy1
+  MUL imgxdl
+  ADD ESI,EAX
+  MOV EAX,vy1
+@pbB_w2:
+
+  CMP EBX,vx2
+  JLE @pbB_w3
+  MOV EBX,vx2
+@pbB_w3:
+
+  CMP ECX,vy2
+  JLE @pbB_w4
+  MOV ECX,vy2
+@pbB_w4:
+
+  SUB EBX,EDI
+  SUB ECX,EAX
+  INC EBX
+  INC ECX
+
+  PUSH EBX
+  PUSH ECX
+  PUSH EAX
+  PUSH EDI
+  CALL pixofsB8
+  POP ECX
+  POP EBX
+  MOV EDI,EAX
+
+  MOV EDX,ESI
+  AND EDX,7
+  SHR ESI,3
+
+  ADD ESI,bitmap
+@pbB_loop1:
+  PUSH ECX
+  PUSH ESI
+  PUSH EDI
+  PUSH EBX
+  ADD EDI,VGAbase
+  MOV EAX,100h
+  LODSB
+  MOV ECX,EDX
+  SHL EAX,CL
+
+  MOV ECX,col
+@pbB_loop2:
+  TEST EAX,80h
+  JZ @pbB_nopix
+  MOV [EDI],CL
+@pbB_nopix:
+  INC EDI
+  SHL EAX,1
+  TEST EAX,10000h
+  JZ @pbB_nobyte
+  MOV EAX,100h
+  LODSB
+@pbB_nobyte:
+  DEC EBX
+  JNZ @pbB_loop2
+
+  POP EBX
+  POP EDI
+  POP ESI
+  POP ECX
+
+  ADD DI,WORD PTR bytperline
+  JNC @pbB_nobs
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+@pbB_nobs:
+
+  ADD ESI,bpl
+  DEC ECX
+  JNZ @pbB_loop1
+@pbB_ende:
+END;
+
+PROCEDURE putbitmapB16(x,y,w,h,bpl,col:longint;var bitmap);assembler;
+VAR imgxdl:longint;
+ASM
+  MOV EAX,bpl
+  SHL EAX,3
+  MOV imgxdl,EAX
+  MOV EDI,x
+  MOV EAX,y
+  MOV EBX,EDI
+  ADD EBX,w
+  DEC EBX
+  MOV ECX,EAX
+  ADD ECX,h
+  DEC ECX
+
+  CMP EDI,vx2
+  JG @pbB_ende
+  CMP EAX,vy2
+  JG @pbB_ende
+  CMP EBX,vx1
+  JL @pbB_ende
+  CMP ECX,vy1
+  JL @pbB_ende
+
+  XOR ESI,ESI
+  CMP EDI,vx1
+  JGE @pbB_w1
+  SUB ESI,EDI
+  MOV EDI,vx1
+  ADD ESI,EDI
+@pbB_w1:
+
+  CMP EAX,vy1
+  JGE @pbB_w2
+  NEG EAX
+  ADD EAX,vy1
+  MUL imgxdl
+  ADD ESI,EAX
+  MOV EAX,vy1
+@pbB_w2:
+
+  CMP EBX,vx2
+  JLE @pbB_w3
+  MOV EBX,vx2
+@pbB_w3:
+
+  CMP ECX,vy2
+  JLE @pbB_w4
+  MOV ECX,vy2
+@pbB_w4:
+
+  SUB EBX,EDI
+  SUB ECX,EAX
+  INC EBX
+  INC ECX
+
+  PUSH EBX
+  PUSH ECX
+  PUSH EAX
+  PUSH EDI
+  CALL pixofsB16
+  POP ECX
+  POP EBX
+  MOV EDI,EAX
+
+  MOV EDX,ESI
+  AND EDX,7
+  SHR ESI,3
+
+  ADD ESI,bitmap
+@pbB_loop1:
+  PUSH ECX
+  PUSH ESI
+  PUSH EDI
+  PUSH EBX
+  ADD EDI,VGAbase
+  MOV EAX,100h
+  LODSB
+  MOV ECX,EDX
+  SHL EAX,CL
+
+  MOV ECX,col
+@pbB_loop2:
+  TEST EAX,80h
+  JZ @pbB_nopix
+  MOV [EDI],CX
+@pbB_nopix:
+  ADD EDI,2
+  SHL EAX,1
+  TEST EAX,10000h
+  JZ @pbB_nobyte
+  MOV EAX,100h
+  LODSB
+@pbB_nobyte:
+  DEC EBX
+  JNZ @pbB_loop2
+
+  POP EBX
+  POP EDI
+  POP ESI
+  POP ECX
+
+  ADD DI,WORD PTR bytperline
+  JNC @pbB_nobs
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+@pbB_nobs:
+
+  ADD ESI,bpl
+  DEC ECX
+  JNZ @pbB_loop1
+@pbB_ende:
+END;
+
+PROCEDURE putbitmapB24(x,y,w,h,bpl,col:longint;var bitmap);assembler;
+VAR imgxdl:longint;
+ASM
+  MOV EAX,bpl
+  SHL EAX,3
+  MOV imgxdl,EAX
+  MOV EDI,x
+  MOV EAX,y
+  MOV EBX,EDI
+  ADD EBX,w
+  DEC EBX
+  MOV ECX,EAX
+  ADD ECX,h
+  DEC ECX
+
+  CMP EDI,vx2
+  JG @pbB_ende
+  CMP EAX,vy2
+  JG @pbB_ende
+  CMP EBX,vx1
+  JL @pbB_ende
+  CMP ECX,vy1
+  JL @pbB_ende
+
+  XOR ESI,ESI
+  CMP EDI,vx1
+  JGE @pbB_w1
+  SUB ESI,EDI
+  MOV EDI,vx1
+  ADD ESI,EDI
+@pbB_w1:
+
+  CMP EAX,vy1
+  JGE @pbB_w2
+  NEG EAX
+  ADD EAX,vy1
+  MUL imgxdl
+  ADD ESI,EAX
+  MOV EAX,vy1
+@pbB_w2:
+
+  CMP EBX,vx2
+  JLE @pbB_w3
+  MOV EBX,vx2
+@pbB_w3:
+
+  CMP ECX,vy2
+  JLE @pbB_w4
+  MOV ECX,vy2
+@pbB_w4:
+
+  SUB EBX,EDI
+  SUB ECX,EAX
+  INC EBX
+  INC ECX
+
+  PUSH EBX
+  PUSH ECX
+  PUSH EAX
+  PUSH EDI
+  CALL pixofsB24
+  POP ECX
+  POP EBX
+  MOV EDI,EAX
+
+  MOV EDX,ESI
+  AND EDX,7
+  SHR ESI,3
+
+  ADD ESI,bitmap
+@pbB_loop1:
+  PUSH ECX
+  PUSH ESI
+  PUSH EDI
+  PUSH EBX
+  ADD EDI,VGAbase
+  MOV EAX,100h
+  LODSB
+  MOV ECX,EDX
+  SHL EAX,CL
+
+  MOV ECX,col
+@pbB_loop2:
+  TEST EAX,80h
+  JZ @pbB_nopix
+  MOV [EDI],CX
+  ROR ECX,16
+  MOV [EDI+2],CL
+  ROR ECX,16
+@pbB_nopix:
+  ADD EDI,2
+  SHL EAX,1
+  TEST EAX,10000h
+  JZ @pbB_nobyte
+  MOV EAX,100h
+  LODSB
+@pbB_nobyte:
+  DEC EBX
+  JNZ @pbB_loop2
+
+  POP EBX
+  POP EDI
+  POP ESI
+  POP ECX
+
+  ADD DI,WORD PTR bytperline
+  JNC @pbB_nobs
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+@pbB_nobs:
+
+  ADD ESI,bpl
+  DEC ECX
+  JNZ @pbB_loop1
+@pbB_ende:
+END;
+
+PROCEDURE putbitmapB32(x,y,w,h,bpl,col:longint;var bitmap);assembler;
+VAR imgxdl:longint;
+ASM
+  MOV EAX,bpl
+  SHL EAX,3
+  MOV imgxdl,EAX
+  MOV EDI,x
+  MOV EAX,y
+  MOV EBX,EDI
+  ADD EBX,w
+  DEC EBX
+  MOV ECX,EAX
+  ADD ECX,h
+  DEC ECX
+
+  CMP EDI,vx2
+  JG @pbB_ende
+  CMP EAX,vy2
+  JG @pbB_ende
+  CMP EBX,vx1
+  JL @pbB_ende
+  CMP ECX,vy1
+  JL @pbB_ende
+
+  XOR ESI,ESI
+  CMP EDI,vx1
+  JGE @pbB_w1
+  SUB ESI,EDI
+  MOV EDI,vx1
+  ADD ESI,EDI
+@pbB_w1:
+
+  CMP EAX,vy1
+  JGE @pbB_w2
+  NEG EAX
+  ADD EAX,vy1
+  MUL imgxdl
+  ADD ESI,EAX
+  MOV EAX,vy1
+@pbB_w2:
+
+  CMP EBX,vx2
+  JLE @pbB_w3
+  MOV EBX,vx2
+@pbB_w3:
+
+  CMP ECX,vy2
+  JLE @pbB_w4
+  MOV ECX,vy2
+@pbB_w4:
+
+  SUB EBX,EDI
+  SUB ECX,EAX
+  INC EBX
+  INC ECX
+
+  PUSH EBX
+  PUSH ECX
+  PUSH EAX
+  PUSH EDI
+  CALL pixofsB32
+  POP ECX
+  POP EBX
+  MOV EDI,EAX
+
+  MOV EDX,ESI
+  AND EDX,7
+  SHR ESI,3
+
+  ADD ESI,bitmap
+@pbB_loop1:
+  PUSH ECX
+  PUSH ESI
+  PUSH EDI
+  PUSH EBX
+  ADD EDI,VGAbase
+  MOV EAX,100h
+  LODSB
+  MOV ECX,EDX
+  SHL EAX,CL
+
+  MOV ECX,col
+@pbB_loop2:
+  TEST EAX,80h
+  JZ @pbB_nopix
+  MOV [EDI],ECX
+@pbB_nopix:
+  ADD EDI,4
+  SHL EAX,1
+  TEST EAX,10000h
+  JZ @pbB_nobyte
+  MOV EAX,100h
+  LODSB
+@pbB_nobyte:
+  DEC EBX
+  JNZ @pbB_loop2
+
+  POP EBX
+  POP EDI
+  POP ESI
+  POP ECX
+
+  ADD DI,WORD PTR bytperline
+  JNC @pbB_nobs
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+@pbB_nobs:
+
+  ADD ESI,bpl
+  DEC ECX
+  JNZ @pbB_loop1
+@pbB_ende:
+END;
+
+{============================= zoomimageB ===================================}
+
+PROCEDURE zoomimageB8(x1,y1,x2,y2:longint;img:pimage);assembler;
+VAR pix,piy,idiff,xfrac,yfrac,nxd,nyd,imgxd:longint;
+ASM
+  MOV EAX,x1
+  MOV EDX,y1
+  MOV ECX,x2
+  MOV EBX,y2
+
+  CMP EAX,ECX
+  JLE @zi8_w1
+  XCHG EAX,ECX
+@zi8_w1:
+  CMP EDX,EBX
+  JLE @zi8_w2
+  XCHG EDX,EBX
+@zi8_w2:
+
+  CMP EAX,vx2
+  JG @zi8_ende
+  CMP EDX,vy2
+  JG @zi8_ende
+  CMP ECX,vx1
+  JL @zi8_ende
+  CMP EBX,vy1
+  JL @zi8_ende
+
+{--------------------}
+  MOV ESI,img
+
+  PUSH EAX
+  PUSH EBX
+  PUSH ECX
+  PUSH EDX
+
+  SUB ECX,EAX
+  SUB EBX,EDX
+  INC ECX
+  INC EBX
+
+  XOR EDX,EDX
+  MOV EAX,[ESI+timage.width]
+  SHL EAX,16
+  DIV ECX
+  MOV pix,EAX
+
+  XOR EDX,EDX
+  MOV EAX,[ESI+timage.height]
+  SHL EAX,16
+  DIV EBX
+  MOV piy,EAX
+
+  MOV EAX,[ESI+timage.bytesperline]
+  MOV imgxd,EAX
+
+  POP EDX
+  POP ECX
+  POP EBX
+  POP EAX
+
+{--------------------}
+  MOV ESI,[ESI+timage.pixeldata]
+  MOV xfrac,0
+  MOV yfrac,0
+
+  CMP EAX,vx1
+  JGE @zi8_w3
+  PUSH EAX
+  PUSH EDX
+  MOV EDX,vx1
+  SUB EDX,EAX
+  MOV EAX,pix
+  MUL EDX
+  MOV WORD PTR xfrac,AX
+  SHR EAX,16
+  MUL bytperpix
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EAX,vx1
+@zi8_w3:
+
+  CMP EDX,vy1
+  JGE @zi8_w4
+  PUSH EAX
+  PUSH EDX
+  MOV EAX,vy1
+  SUB EAX,EDX
+  MUL piy
+  MOV WORD PTR yfrac,AX
+  SHR EAX,16
+  MUL imgxd
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EDX,vy1
+@zi8_w4:
+
+  CMP ECX,vx2
+  JLE @zi8_w5
+  MOV ECX,vx2
+@zi8_w5:
+
+  CMP EBX,vy2
+  JLE @zi8_w6
+  MOV EBX,vy2
+@zi8_w6:
+
+{--------------------}
+  SUB ECX,EAX
+  SUB EBX,EDX
+  INC ECX
+  INC EBX
+  MOV nxd,ECX
+  MOV nyd,EBX
+
+  PUSH EDX
+  PUSH EAX
+  CALL pixofsB8
+  MOV EDI,EAX
+
+  MOV EAX,ECX
+  DEC EAX
+  MUL pix
+  MOV EDX,xfrac
+  ADD EAX,EDX
+  SHR EAX,16
+  INC EAX
+  MOV EDX,bytperpix
+  MUL EDX
+  MOV idiff,EAX
+
+  ADD xfrac,00010000h
+
+{----------------------}
+  MOV EDX,yfrac
+  MOV ECX,nyd
+@zi8_loop12:
+  CMP EDX,00010000h
+  JL @zi8_draw1
+  SUB EDX,00010000h
+  ADD ESI,imgxd
+  JMP @zi8_loop12
+@zi8_draw1:
+  PUSH ECX
+
+  PUSH EDX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV EBX,xfrac
+  MOV EDX,pix
+  MOV ECX,nxd
+@zi8_loop3:
+  SUB EBX,00010000h
+  LODSB
+@zi8_loop4:
+  CMP EBX,00010000h
+  JGE @zi8_loop3
+  STOSB
+  ADD EBX,EDX
+  DEC ECX
+  JNZ @zi8_loop4
+  POP EDI
+  POP EDX
+
+  SUB ESI,idiff
+  ADD DI,WORD PTR bytperline
+  JNC @zi8_nobs
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+@zi8_nobs:
+  ADD EDX,piy
+  POP ECX
+  DEC ECX
+  JNZ @zi8_loop12
+@zi8_ende:
+END;
+
+PROCEDURE zoomimageB16(x1,y1,x2,y2:longint;img:pimage);assembler;
+VAR pix,piy,idiff,xfrac,yfrac,nxd,nyd,imgxd:longint;
+ASM
+  MOV EAX,x1
+  MOV EDX,y1
+  MOV ECX,x2
+  MOV EBX,y2
+
+  CMP EAX,ECX
+  JLE @zi16_w1
+  XCHG EAX,ECX
+@zi16_w1:
+  CMP EDX,EBX
+  JLE @zi16_w2
+  XCHG EDX,EBX
+@zi16_w2:
+
+  CMP EAX,vx2
+  JG @zi16_ende
+  CMP EDX,vy2
+  JG @zi16_ende
+  CMP ECX,vx1
+  JL @zi16_ende
+  CMP EBX,vy1
+  JL @zi16_ende
+
+{--------------------}
+  MOV ESI,img
+
+  PUSH EAX
+  PUSH EBX
+  PUSH ECX
+  PUSH EDX
+
+  SUB ECX,EAX
+  SUB EBX,EDX
+  INC ECX
+  INC EBX
+
+  XOR EDX,EDX
+  MOV EAX,[ESI+timage.width]
+  SHL EAX,16
+  DIV ECX
+  MOV pix,EAX
+
+  XOR EDX,EDX
+  MOV EAX,[ESI+timage.height]
+  SHL EAX,16
+  DIV EBX
+  MOV piy,EAX
+
+  MOV EAX,[ESI+timage.bytesperline]
+  MOV imgxd,EAX
+
+  POP EDX
+  POP ECX
+  POP EBX
+  POP EAX
+
+{--------------------}
+  MOV ESI,[ESI+timage.pixeldata]
+  MOV xfrac,0
+  MOV yfrac,0
+
+  CMP EAX,vx1
+  JGE @zi16_w3
+  PUSH EAX
+  PUSH EDX
+  MOV EDX,vx1
+  SUB EDX,EAX
+  MOV EAX,pix
+  MUL EDX
+  MOV WORD PTR xfrac,AX
+  SHR EAX,16
+  MUL bytperpix
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EAX,vx1
+@zi16_w3:
+
+  CMP EDX,vy1
+  JGE @zi16_w4
+  PUSH EAX
+  PUSH EDX
+  MOV EAX,vy1
+  SUB EAX,EDX
+  MUL piy
+  MOV WORD PTR yfrac,AX
+  SHR EAX,16
+  MUL DWORD PTR imgxd
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EDX,vy1
+@zi16_w4:
+
+  CMP ECX,vx2
+  JLE @zi16_w5
+  MOV ECX,vx2
+@zi16_w5:
+
+  CMP EBX,vy2
+  JLE @zi16_w6
+  MOV EBX,vy2
+@zi16_w6:
+
+{--------------------}
+  SUB ECX,EAX
+  SUB EBX,EDX
+  INC ECX
+  INC EBX
+  MOV nxd,ECX
+  MOV nyd,EBX
+
+  PUSH EDX
+  PUSH EAX
+  CALL pixofsB16
+  MOV EDI,EAX
+
+  MOV EAX,ECX
+  DEC EAX
+  MUL pix
+  MOV EDX,xfrac
+  ADD EAX,EDX
+  SHR EAX,16
+  INC EAX
+  MOV EDX,bytperpix
+  MUL EDX
+  MOV idiff,EAX
+
+  ADD xfrac,00010000h
+
+{---------------------}
+  MOV EDX,yfrac
+  MOV ECX,nyd
+@zi16_loop12:
+  CMP EDX,00010000h
+  JL @zi16_draw1
+  SUB EDX,00010000h
+  ADD ESI,imgxd
+  JMP @zi16_loop12
+@zi16_draw1:
+  PUSH ECX
+
+  PUSH EDX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV EBX,xfrac
+  MOV EDX,pix
+  MOV ECX,nxd
+@zi16_loop3:
+  SUB EBX,00010000h
+  LODSW
+@zi16_loop4:
+  CMP EBX,00010000h
+  JGE @zi16_loop3
+  ADD EBX,pix
+  STOSW
+  DEC ECX
+  JNZ @zi16_loop4
+  POP EDI
+  POP EDX
+
+  SUB ESI,idiff
+  ADD DI,WORD PTR bytperline
+  JNC @zi16_nobs
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+@zi16_nobs:
+  ADD EDX,piy
+  POP ECX
+  DEC ECX
+  JNZ @zi16_loop12
+@zi16_ende:
+END;
+
+PROCEDURE zoomimageB24(x1,y1,x2,y2:longint;img:pimage);assembler;
+VAR pix,piy,idiff,xfrac,yfrac,nxd,nyd,imgxd:longint;
+ASM
+  MOV EAX,x1
+  MOV EDX,y1
+  MOV ECX,x2
+  MOV EBX,y2
+
+  CMP EAX,ECX
+  JLE @zi24_w1
+  XCHG EAX,ECX
+@zi24_w1:
+  CMP EDX,EBX
+  JLE @zi24_w2
+  XCHG EDX,EBX
+@zi24_w2:
+
+  CMP EAX,vx2
+  JG @zi24_ende
+  CMP EDX,vy2
+  JG @zi24_ende
+  CMP ECX,vx1
+  JL @zi24_ende
+  CMP EBX,vy1
+  JL @zi24_ende
+
+{--------------------}
+  MOV ESI,img
+
+  PUSH EAX
+  PUSH EBX
+  PUSH ECX
+  PUSH EDX
+
+  SUB ECX,EAX
+  SUB EBX,EDX
+  INC ECX
+  INC EBX
+
+  XOR EDX,EDX
+  MOV EAX,[ESI+timage.width]
+  SHL EAX,16
+  DIV ECX
+  MOV pix,EAX
+
+  XOR EDX,EDX
+  MOV EAX,[ESI+timage.height]
+  SHL EAX,16
+  DIV EBX
+  MOV piy,EAX
+
+  MOV EAX,[ESI+timage.bytesperline]
+  MOV imgxd,EAX
+
+  POP EDX
+  POP ECX
+  POP EBX
+  POP EAX
+
+{--------------------}
+  MOV ESI,[ESI+timage.pixeldata]
+  MOV xfrac,0
+  MOV yfrac,0
+
+  CMP EAX,vx1
+  JGE @zi24_w3
+  PUSH EAX
+  PUSH EDX
+  MOV EDX,vx1
+  SUB EDX,EAX
+  MOV EAX,pix
+  MUL EDX
+  MOV WORD PTR xfrac,AX
+  SHR EAX,16
+  MUL bytperpix
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EAX,vx1
+@zi24_w3:
+
+  CMP EDX,vy1
+  JGE @zi24_w4
+  PUSH EAX
+  PUSH EDX
+  MOV EAX,vy1
+  SUB EAX,EDX
+  MUL piy
+  MOV WORD PTR yfrac,AX
+  SHR EAX,16
+  MUL DWORD PTR imgxd
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EDX,vy1
+@zi24_w4:
+
+  CMP ECX,vx2
+  JLE @zi24_w5
+  MOV ECX,vx2
+@zi24_w5:
+
+  CMP EBX,vy2
+  JLE @zi24_w6
+  MOV EBX,vy2
+@zi24_w6:
+
+{--------------------}
+  SUB ECX,EAX
+  SUB EBX,EDX
+  INC ECX
+  INC EBX
+  MOV nxd,ECX
+  MOV nyd,EBX
+
+  PUSH EDX
+  PUSH EAX
+  CALL pixofsB24
+  MOV EDI,EAX
+
+  MOV EAX,ECX
+  DEC EAX
+  MUL pix
+  MOV EDX,xfrac
+  ADD EAX,EDX
+  SHR EAX,16
+  INC EAX
+  MOV EDX,bytperpix
+  MUL EDX
+  MOV idiff,EAX
+
+  ADD xfrac,00010000h
+
+{----------------------}
+  MOV EDX,yfrac
+  MOV ECX,nyd
+@zi24_loop12:
+  CMP EDX,00010000h
+  JL @zi24_draw1
+  SUB EDX,00010000h
+  ADD ESI,imgxd
+  JMP @zi24_loop12
+@zi24_draw1:
+  PUSH ECX
+
+  PUSH EDX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV EBX,xfrac
+  MOV EDX,pix
+  MOV ECX,nxd
+@zi24_loop3:
+  SUB EBX,00010000h
+  DEC ESI
+{  LODSW
+  SHL EAX,16
+  LODSB
+  ROL EAX,16 }
+  LODSD
+  SHR EAX,8
+@zi24_loop4:
+  CMP EBX,00010000h
+  JGE @zi24_loop3
+  STOSW
+  ROL EAX,16
+  STOSB
+  ROL EAX,16
+  ADD EBX,EDX
+  DEC ECX
+  JNZ @zi24_loop4
+  POP EDI
+  POP EDX
+
+  SUB ESI,idiff
+  ADD DI,WORD PTR bytperline
+  JNC @zi24_nobs
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+@zi24_nobs:
+  ADD EDX,piy
+  POP ECX
+  DEC ECX
+  JNZ @zi24_loop12
+@zi24_ende:
+END;
+
+PROCEDURE zoomimageB32(x1,y1,x2,y2:longint;img:pimage);assembler;
+VAR pix,piy,idiff,xfrac,yfrac,nxd,nyd,imgxd:longint;
+ASM
+  MOV EAX,x1
+  MOV EDX,y1
+  MOV ECX,x2
+  MOV EBX,y2
+
+  CMP EAX,ECX
+  JLE @zi32_w1
+  XCHG EAX,ECX
+@zi32_w1:
+  CMP EDX,EBX
+  JLE @zi32_w2
+  XCHG EDX,EBX
+@zi32_w2:
+
+  CMP EAX,vx2
+  JG @zi32_ende
+  CMP EDX,vy2
+  JG @zi32_ende
+  CMP ECX,vx1
+  JL @zi32_ende
+  CMP EBX,vy1
+  JL @zi32_ende
+
+{--------------------}
+  MOV ESI,img
+
+  PUSH EAX
+  PUSH EBX
+  PUSH ECX
+  PUSH EDX
+
+  SUB ECX,EAX
+  SUB EBX,EDX
+  INC ECX
+  INC EBX
+
+  XOR EDX,EDX
+  MOV EAX,[ESI+timage.width]
+  SHL EAX,16
+  DIV ECX
+  MOV pix,EAX
+
+  XOR EDX,EDX
+  MOV EAX,[ESI+timage.height]
+  SHL EAX,16
+  DIV EBX
+  MOV piy,EAX
+
+  MOV EAX,[ESI+timage.bytesperline]
+  MOV imgxd,EAX
+
+  POP EDX
+  POP ECX
+  POP EBX
+  POP EAX
+
+{--------------------}
+  MOV ESI,[ESI+timage.pixeldata]
+  MOV xfrac,0
+  MOV yfrac,0
+
+  CMP EAX,vx1
+  JGE @zi32_w3
+  PUSH EAX
+  PUSH EDX
+  MOV EDX,vx1
+  SUB EDX,EAX
+  MOV EAX,pix
+  MUL EDX
+  MOV WORD PTR xfrac,AX
+  SHR EAX,16
+  MUL bytperpix
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EAX,vx1
+@zi32_w3:
+
+  CMP EDX,vy1
+  JGE @zi32_w4
+  PUSH EAX
+  PUSH EDX
+  MOV EAX,vy1
+  SUB EAX,EDX
+  MUL piy
+  MOV WORD PTR yfrac,AX
+  SHR EAX,16
+  MUL DWORD PTR imgxd
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EDX,vy1
+@zi32_w4:
+
+  CMP ECX,vx2
+  JLE @zi32_w5
+  MOV ECX,vx2
+@zi32_w5:
+
+  CMP EBX,vy2
+  JLE @zi32_w6
+  MOV EBX,vy2
+@zi32_w6:
+
+{--------------------}
+  SUB ECX,EAX
+  SUB EBX,EDX
+  INC ECX
+  INC EBX
+  MOV nxd,ECX
+  MOV nyd,EBX
+
+  PUSH EDX
+  PUSH EAX
+  CALL pixofsB32
+  MOV EDI,EAX
+
+  MOV EAX,ECX
+  DEC EAX
+  MUL pix
+  MOV EDX,xfrac
+  ADD EAX,EDX
+  SHR EAX,16
+  INC EAX
+  MOV EDX,bytperpix
+  MUL EDX
+  MOV idiff,EAX
+
+  ADD xfrac,00010000h
+
+{----------------------}
+  MOV EDX,yfrac
+  MOV ECX,nyd
+@zi32_loop12:
+  CMP EDX,00010000h
+  JL @zi32_draw1
+  SUB EDX,00010000h
+  ADD ESI,imgxd
+  JMP @zi32_loop12
+@zi32_draw1:
+  PUSH ECX
+
+  PUSH EDX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV EBX,xfrac
+  MOV EDX,pix
+  MOV ECX,nxd
+@zi32_loop3:
+  SUB EBX,00010000h
+  LODSD
+@zi32_loop4:
+  CMP EBX,00010000h
+  JGE @zi32_loop3
+  STOSD
+  ADD EBX,EDX
+  DEC ECX
+  JNZ @zi32_loop4
+  POP EDI
+  POP EDX
+
+  SUB ESI,idiff
+  ADD DI,WORD PTR bytperline
+  JNC @zi32_nobs
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+@zi32_nobs:
+  ADD EDX,piy
+  POP ECX
+  DEC ECX
+  JNZ @zi32_loop12
+@zi32_ende:
+END;
+
+{============================= zoomimageCB =================================}
+
+PROCEDURE zoomimageCB8(x1,y1,x2,y2:longint;img:pimage);assembler;
+VAR pix,piy,idiff,xfrac,yfrac,nxd,nyd,imgxd,f:longint;
+ASM
+  MOV ESI,img
+  MOV EAX,[ESI+timage.transparencycolor]
+  MOV f,EAX
+
+  MOV EAX,x1
+  MOV EDX,y1
+  MOV ECX,x2
+  MOV EBX,y2
+
+  CMP EAX,ECX
+  JLE @zih8_w1
+  XCHG EAX,ECX
+@zih8_w1:
+  CMP EDX,EBX
+  JLE @zih8_w2
+  XCHG EDX,EBX
+@zih8_w2:
+
+  CMP EAX,vx2
+  JG @zih8_ende
+  CMP EDX,vy2
+  JG @zih8_ende
+  CMP ECX,vx1
+  JL @zih8_ende
+  CMP EBX,vy1
+  JL @zih8_ende
+
+{--------------------}
+  PUSH EAX
+  PUSH EBX
+  PUSH ECX
+  PUSH EDX
+
+  SUB ECX,EAX
+  SUB EBX,EDX
+  INC ECX
+  INC EBX
+
+  XOR EDX,EDX
+  MOV EAX,[ESI+timage.width]
+  SHL EAX,16
+  DIV ECX
+  MOV pix,EAX
+
+  XOR EDX,EDX
+  MOV EAX,[ESI+timage.height]
+  SHL EAX,16
+  DIV EBX
+  MOV piy,EAX
+
+  MOV EAX,[ESI+timage.bytesperline]
+  MOV imgxd,EAX
+
+  POP EDX
+  POP ECX
+  POP EBX
+  POP EAX
+
+{--------------------}
+  MOV ESI,[ESI+timage.pixeldata]
+  MOV xfrac,0
+  MOV yfrac,0
+
+  CMP EAX,vx1
+  JGE @zih8_w3
+  PUSH EAX
+  PUSH EDX
+  MOV EDX,vx1
+  SUB EDX,EAX
+  MOV EAX,pix
+  MUL EDX
+  MOV WORD PTR xfrac,AX
+  SHR EAX,16
+  MUL bytperpix
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EAX,vx1
+@zih8_w3:
+
+  CMP EDX,vy1
+  JGE @zih8_w4
+  PUSH EAX
+  PUSH EDX
+  MOV EAX,vy1
+  SUB EAX,EDX
+  MUL piy
+  MOV WORD PTR yfrac,AX
+  SHR EAX,16
+  MUL imgxd
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EDX,vy1
+@zih8_w4:
+
+  CMP ECX,vx2
+  JLE @zih8_w5
+  MOV ECX,vx2
+@zih8_w5:
+
+  CMP EBX,vy2
+  JLE @zih8_w6
+  MOV EBX,vy2
+@zih8_w6:
+
+{--------------------}
+  SUB ECX,EAX
+  SUB EBX,EDX
+  INC ECX
+  INC EBX
+  MOV nxd,ECX
+  MOV nyd,EBX
+
+  PUSH EDX
+  PUSH EAX
+  CALL pixofsB8
+  MOV EDI,EAX
+
+  MOV EAX,ECX
+  DEC EAX
+  MUL pix
+  MOV EDX,xfrac
+  ADD EAX,EDX
+  SHR EAX,16
+  INC EAX
+  MOV EDX,bytperpix
+  MUL EDX
+  MOV idiff,EAX
+
+  ADD xfrac,00010000h
+
+{----------------------}
+  MOV EDX,yfrac
+  MOV ECX,nyd
+@zih8_loop12:
+  CMP EDX,00010000h
+  JL @zih8_draw1
+  SUB EDX,00010000h
+  ADD ESI,imgxd
+  JMP @zih8_loop12
+@zih8_draw1:
+  PUSH ECX
+
+  PUSH EDX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV EBX,xfrac
+  MOV EDX,pix
+  MOV ECX,nxd
+@zih8_loop3:
+  SUB EBX,00010000h
+  LODSB
+  CMP AL,BYTE PTR f
+  JE @zih8_loop4b
+@zih8_loop4a:
+  CMP EBX,00010000h
+  JGE @zih8_loop3
+  STOSB
+  ADD EBX,EDX
+  DEC ECX
+  JNZ @zih8_loop4a
+  JMP @zih8_over
+@zih8_loop4b:
+  CMP EBX,00010000h
+  JGE @zih8_loop3
+  INC DI
+  ADD EBX,EDX
+  DEC ECX
+  JNZ @zih8_loop4b
+@zih8_over:
+  POP EDI
+  POP EDX
+
+  SUB ESI,idiff
+  ADD DI,WORD PTR bytperline
+  JNC @zih8_nobs
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+@zih8_nobs:
+  ADD EDX,piy
+  POP ECX
+  DEC ECX
+  JNZ @zih8_loop12
+@zih8_ende:
+END;
+
+PROCEDURE zoomimageCB16(x1,y1,x2,y2:longint;img:pimage);assembler;
+VAR pix,piy,idiff,xfrac,yfrac,nxd,nyd,imgxd,f:longint;
+ASM
+  MOV ESI,img
+  MOV EAX,[ESI+timage.transparencycolor]
+  MOV f,EAX
+
+  MOV EAX,x1
+  MOV EDX,y1
+  MOV ECX,x2
+  MOV EBX,y2
+
+  CMP EAX,ECX
+  JLE @zih16_w1
+  XCHG EAX,ECX
+@zih16_w1:
+  CMP EDX,EBX
+  JLE @zih16_w2
+  XCHG EDX,EBX
+@zih16_w2:
+
+  CMP EAX,vx2
+  JG @zih16_ende
+  CMP EDX,vy2
+  JG @zih16_ende
+  CMP ECX,vx1
+  JL @zih16_ende
+  CMP EBX,vy1
+  JL @zih16_ende
+
+{--------------------}
+  PUSH EAX
+  PUSH EBX
+  PUSH ECX
+  PUSH EDX
+
+  SUB ECX,EAX
+  SUB EBX,EDX
+  INC ECX
+  INC EBX
+
+  XOR EDX,EDX
+  MOV EAX,[ESI+timage.width]
+  SHL EAX,16
+  DIV ECX
+  MOV pix,EAX
+
+  XOR EDX,EDX
+  MOV EAX,[ESI+timage.height]
+  SHL EAX,16
+  DIV EBX
+  MOV piy,EAX
+
+  MOV EAX,[ESI+timage.bytesperline]
+  MOV imgxd,EAX
+
+  POP EDX
+  POP ECX
+  POP EBX
+  POP EAX
+
+{--------------------}
+  MOV ESI,[ESI+timage.pixeldata]
+  MOV xfrac,0
+  MOV yfrac,0
+
+  CMP EAX,vx1
+  JGE @zih16_w3
+  PUSH EAX
+  PUSH EDX
+  MOV EDX,vx1
+  SUB EDX,EAX
+  MOV EAX,pix
+  MUL EDX
+  MOV WORD PTR xfrac,AX
+  SHR EAX,16
+  MUL bytperpix
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EAX,vx1
+@zih16_w3:
+
+  CMP EDX,vy1
+  JGE @zih16_w4
+  PUSH EAX
+  PUSH EDX
+  MOV EAX,vy1
+  SUB EAX,EDX
+  MUL piy
+  MOV WORD PTR yfrac,AX
+  SHR EAX,16
+  MUL DWORD PTR imgxd
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EDX,vy1
+@zih16_w4:
+
+  CMP ECX,vx2
+  JLE @zih16_w5
+  MOV ECX,vx2
+@zih16_w5:
+
+  CMP EBX,vy2
+  JLE @zih16_w6
+  MOV EBX,vy2
+@zih16_w6:
+
+{--------------------}
+  SUB ECX,EAX
+  SUB EBX,EDX
+  INC ECX
+  INC EBX
+  MOV nxd,ECX
+  MOV nyd,EBX
+
+  PUSH EDX
+  PUSH EAX
+  CALL pixofsB16
+  MOV EDI,EAX
+
+  MOV EAX,ECX
+  DEC EAX
+  MUL pix
+  MOV EDX,xfrac
+  ADD EAX,EDX
+  SHR EAX,16
+  INC EAX
+  MOV EDX,bytperpix
+  MUL EDX
+  MOV idiff,EAX
+
+  ADD xfrac,00010000h
+
+{----------------------}
+  MOV EDX,yfrac
+  MOV ECX,nyd
+@zih16_loop12:
+  CMP EDX,00010000h
+  JL @zih16_draw1
+  SUB EDX,00010000h
+  ADD ESI,imgxd
+  JMP @zih16_loop12
+@zih16_draw1:
+  PUSH ECX
+
+  PUSH EDX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV EBX,xfrac
+  MOV EDX,pix
+  MOV ECX,nxd
+@zih16_loop3:
+  SUB EBX,00010000h
+  LODSW
+  CMP AX,WORD PTR f
+  JE @zih16_loop4b
+@zih16_loop4a:
+  CMP EBX,00010000h
+  JGE @zih16_loop3
+  STOSW
+  ADD EBX,EDX
+  DEC ECX
+  JNZ @zih16_loop4a
+  JMP @zih16_over
+@zih16_loop4b:
+  CMP EBX,00010000h
+  JGE @zih16_loop3
+  ADD EDI,2
+  ADD EBX,EDX
+  DEC ECX
+  JNZ @zih16_loop4b
+@zih16_over:
+  POP EDI
+  POP EDX
+
+  SUB ESI,idiff
+  ADD DI,WORD PTR bytperline
+  JNC @zih16_nobs
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+@zih16_nobs:
+  ADD EDX,piy
+  POP ECX
+  DEC ECX
+  JNZ @zih16_loop12
+@zih16_ende:
+END;
+
+PROCEDURE zoomimageCB24(x1,y1,x2,y2:longint;img:pimage);assembler;
+VAR pix,piy,idiff,xfrac,yfrac,nxd,nyd,imgxd,f:longint;
+ASM
+  MOV ESI,img
+  MOV EAX,[ESI+timage.transparencycolor]
+  MOV f,EAX
+
+  MOV EAX,x1
+  MOV EDX,y1
+  MOV ECX,x2
+  MOV EBX,y2
+
+  CMP EAX,ECX
+  JLE @zih24_w1
+  XCHG EAX,ECX
+@zih24_w1:
+  CMP EDX,EBX
+  JLE @zih24_w2
+  XCHG EDX,EBX
+@zih24_w2:
+
+  CMP EAX,vx2
+  JG @zih24_ende
+  CMP EDX,vy2
+  JG @zih24_ende
+  CMP ECX,vx1
+  JL @zih24_ende
+  CMP EBX,vy1
+  JL @zih24_ende
+
+{--------------------}
+  PUSH EAX
+  PUSH EBX
+  PUSH ECX
+  PUSH EDX
+
+  SUB ECX,EAX
+  SUB EBX,EDX
+  INC ECX
+  INC EBX
+
+  XOR EDX,EDX
+  MOV EAX,[ESI+timage.width]
+  SHL EAX,16
+  DIV ECX
+  MOV pix,EAX
+
+  XOR EDX,EDX
+  MOV EAX,[ESI+timage.height]
+  SHL EAX,16
+  DIV EBX
+  MOV piy,EAX
+
+  MOV EAX,[ESI+timage.bytesperline]
+  MOV imgxd,EAX
+
+  POP EDX
+  POP ECX
+  POP EBX
+  POP EAX
+
+{--------------------}
+  MOV ESI,[ESI+timage.pixeldata]
+  MOV xfrac,0
+  MOV yfrac,0
+
+  CMP EAX,vx1
+  JGE @zih24_w3
+  PUSH EAX
+  PUSH EDX
+  MOV EDX,vx1
+  SUB EDX,EAX
+  MOV EAX,pix
+  MUL EDX
+  MOV WORD PTR xfrac,AX
+  SHR EAX,16
+  MUL bytperpix
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EAX,vx1
+@zih24_w3:
+
+  CMP EDX,vy1
+  JGE @zih24_w4
+  PUSH EAX
+  PUSH EDX
+  MOV EAX,vy1
+  SUB EAX,EDX
+  MUL piy
+  MOV WORD PTR yfrac,AX
+  SHR EAX,16
+  MUL DWORD PTR imgxd
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EDX,vy1
+@zih24_w4:
+
+  CMP ECX,vx2
+  JLE @zih24_w5
+  MOV ECX,vx2
+@zih24_w5:
+
+  CMP EBX,vy2
+  JLE @zih24_w6
+  MOV EBX,vy2
+@zih24_w6:
+
+{--------------------}
+  SUB ECX,EAX
+  SUB EBX,EDX
+  INC ECX
+  INC EBX
+  MOV nxd,ECX
+  MOV nyd,EBX
+
+  PUSH EDX
+  PUSH EAX
+  CALL pixofsB24
+  MOV EDI,EAX
+
+  MOV EAX,ECX
+  DEC EAX
+  MUL pix
+  MOV EDX,xfrac
+  ADD EAX,EDX
+  SHR EAX,16
+  INC EAX
+  MOV EDX,bytperpix
+  MUL EDX
+  MOV idiff,EAX
+
+  ADD xfrac,00010000h
+
+{----------------------}
+  MOV EDX,yfrac
+  MOV ECX,nyd
+@zih24_loop12:
+  CMP EDX,00010000h
+  JL @zih24_draw1
+  SUB EDX,00010000h
+  ADD ESI,imgxd
+  JMP @zih24_loop12
+@zih24_draw1:
+  PUSH ECX
+
+  PUSH EDX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV EBX,xfrac
+  MOV EDX,pix
+  MOV ECX,nxd
+@zih24_loop3:
+  SUB EBX,00010000h
+{  LODSW
+  SHL EAX,16
+  LODSB
+  ROL EAX,16 }
+  DEC ESI
+  LODSD
+  SHR EAX,8
+  CMP EAX,f
+  JE @zih24_loop4b
+@zih24_loop4a:
+  CMP EBX,00010000h
+  JGE @zih24_loop3
+  STOSW
+  ROL EAX,16
+  STOSB
+  ROL EAX,16
+  ADD EBX,EDX
+  DEC ECX
+  JNZ @zih24_loop4a
+  JMP @zih24_over
+@zih24_loop4b:
+  CMP EBX,00010000h
+  JGE @zih24_loop3
+  ADD EDI,3
+  ADD EBX,EDX
+  DEC ECX
+  JNZ @zih24_loop4b
+@zih24_over:
+  POP EDI
+  POP EDX
+
+  SUB ESI,idiff
+  ADD DI,WORD PTR bytperline
+  JNC @zih24_nobs
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+@zih24_nobs:
+  ADD EDX,piy
+  POP ECX
+  DEC ECX
+  JNZ @zih24_loop12
+@zih24_ende:
+END;
+
+PROCEDURE zoomimageCB32(x1,y1,x2,y2:longint;img:pimage);assembler;
+VAR pix,piy,idiff,xfrac,yfrac,nxd,nyd,imgxd,f:longint;
+ASM
+  MOV ESI,img
+  MOV EAX,[ESI+timage.transparencycolor]
+  MOV f,EAX
+
+  MOV EAX,x1
+  MOV EDX,y1
+  MOV ECX,x2
+  MOV EBX,y2
+
+  CMP EAX,ECX
+  JLE @zih32_w1
+  XCHG EAX,ECX
+@zih32_w1:
+  CMP EDX,EBX
+  JLE @zih32_w2
+  XCHG EDX,EBX
+@zih32_w2:
+
+  CMP EAX,vx2
+  JG @zih32_ende
+  CMP EDX,vy2
+  JG @zih32_ende
+  CMP ECX,vx1
+  JL @zih32_ende
+  CMP EBX,vy1
+  JL @zih32_ende
+
+{--------------------}
+  PUSH EAX
+  PUSH EBX
+  PUSH ECX
+  PUSH EDX
+
+  SUB ECX,EAX
+  SUB EBX,EDX
+  INC ECX
+  INC EBX
+
+  XOR EDX,EDX
+  MOV EAX,[ESI+timage.width]
+  SHL EAX,16
+  DIV ECX
+  MOV pix,EAX
+
+  XOR EDX,EDX
+  MOV EAX,[ESI+timage.height]
+  SHL EAX,16
+  DIV EBX
+  MOV piy,EAX
+
+  MOV EAX,[ESI+timage.bytesperline]
+  MOV imgxd,EAX
+
+  POP EDX
+  POP ECX
+  POP EBX
+  POP EAX
+
+{--------------------}
+  MOV ESI,[ESI+timage.pixeldata]
+  MOV xfrac,0
+  MOV yfrac,0
+
+  CMP EAX,vx1
+  JGE @zih32_w3
+  PUSH EAX
+  PUSH EDX
+  MOV EDX,vx1
+  SUB EDX,EAX
+  MOV EAX,pix
+  MUL EDX
+  MOV WORD PTR xfrac,AX
+  SHR EAX,16
+  MUL bytperpix
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EAX,vx1
+@zih32_w3:
+
+  CMP EDX,vy1
+  JGE @zih32_w4
+  PUSH EAX
+  PUSH EDX
+  MOV EAX,vy1
+  SUB EAX,EDX
+  MUL piy
+  MOV WORD PTR yfrac,AX
+  SHR EAX,16
+  MUL DWORD PTR imgxd
+  ADD ESI,EAX
+  POP EDX
+  POP EAX
+  MOV EDX,vy1
+@zih32_w4:
+
+  CMP ECX,vx2
+  JLE @zih32_w5
+  MOV ECX,vx2
+@zih32_w5:
+
+  CMP EBX,vy2
+  JLE @zih32_w6
+  MOV EBX,vy2
+@zih32_w6:
+
+{--------------------}
+  SUB ECX,EAX
+  SUB EBX,EDX
+  INC ECX
+  INC EBX
+  MOV nxd,ECX
+  MOV nyd,EBX
+
+  PUSH EDX
+  PUSH EAX
+  CALL pixofsB32
+  MOV EDI,EAX
+
+  MOV EAX,ECX
+  DEC EAX
+  MUL pix
+  MOV EDX,xfrac
+  ADD EAX,EDX
+  SHR EAX,16
+  INC EAX
+  MOV EDX,bytperpix
+  MUL EDX
+  MOV idiff,EAX
+
+  ADD xfrac,00010000h
+
+{----------------------}
+  MOV EDX,yfrac
+  MOV ECX,nyd
+@zih32_loop12:
+  CMP EDX,00010000h
+  JL @zih32_draw1
+  SUB EDX,00010000h
+  ADD ESI,imgxd
+  JMP @zih32_loop12
+@zih32_draw1:
+  PUSH ECX
+
+  PUSH EDX
+  PUSH EDI
+  ADD EDI,VGAbase
+  MOV EBX,xfrac
+  MOV EDX,pix
+  MOV ECX,nxd
+@zih32_loop3:
+  SUB EBX,00010000h
+  LODSD
+  CMP EAX,f
+  JE @zih32_loop4b
+@zih32_loop4a:
+  CMP EBX,00010000h
+  JGE @zih32_loop3
+  STOSD
+  ADD EBX,EDX
+  DEC ECX
+  JNZ @zih32_loop4a
+  JMP @zih32_over
+@zih32_loop4b:
+  CMP EBX,00010000h
+  JGE @zih32_loop3
+  ADD DI,4
+  ADD EBX,EDX
+  DEC ECX
+  JNZ @zih32_loop4b
+@zih32_over:
+  POP EDI
+  POP EDX
+
+  SUB ESI,idiff
+  ADD DI,WORD PTR bytperline
+  JNC @zih32_nobs
+  PUSHAD
+  MOV DX,curbank
+  INC DX
+  MOV curbank,DX
+  CALL bankswitch
+  POPAD
+@zih32_nobs:
+  ADD EDX,piy
+  POP ECX
+  DEC ECX
+  JNZ @zih32_loop12
+@zih32_ende:
+END;
+
+{==========================================================================}

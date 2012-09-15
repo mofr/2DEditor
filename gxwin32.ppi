@@ -1,0 +1,191 @@
+{
+    This file is a part of the graphics library GraphiX
+    Copyright (C) 2001 Michael Knapp
+
+    This library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+    License as published by the Free Software Foundation; either
+    version 2.1 of the License, or (at your option) any later version.
+
+    This library is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    Lesser General Public License for more details.
+
+    You should have received a copy of the GNU Lesser General Public
+    License along with this library; if not, write to the Free Software
+    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+}
+
+{============================================================================}
+
+PROCEDURE AdjustAddressOld(old_ds_base,new_ds_base:dword);forward;
+
+{============================================================================}
+
+PROCEDURE GetGraphix(init:longint);
+BEGIN
+  CurGraphiX.detected:=TRUE;
+  CurGraphiX.pcidev:=FALSE;
+  CurGraphiX.vbeinit:=FALSE;
+  CurGraphiX.vgacomp:=TRUE;
+  CurGraphiX.oldinit:=FALSE;
+  CurGraphiX.checkmem:=FALSE;
+  CurGraphiX.name:='';
+  CurGraphiX.vendorname:='';
+  CurGraphiX.memory:=0;
+  CurGraphiX.init:=ig_directdraw;
+  CurGraphiX.memmode:=0;
+  CurGraphiX.flags:=0; {gx_xxx - Konstanten}
+  CurGraphiX.numpages:=0;
+  CurGraphiX.bankshift:=0;
+  CurGraphiX.LFBaddr:=0;
+  CurGraphiX.LFBsize:=0;
+  CurGraphiX.MMIOaddr:=0;
+  CurGraphiX.MMIOsize:=0;
+  CurGraphiX.ModeList:=nil;
+  CurGraphiX.setrgbcolor:=@setrgbcolor_dd;
+  CurGraphiX.retrace:=@retrace_dd;
+  CurGraphiX.retracestart:=@retracestart_dd;
+  CurGraphiX.retraceend:=@retraceend_dd;
+  CurGraphiX.sethwaprocs:=@DDsethwaprocs;
+  {-----}
+  CurGraphiX.detected:=TRUE;
+  CurGraphiX.name:='DirectDraw';
+  CurGraphiX.vendorname:='GraphiX/DirectDraw Interface';
+END;
+
+{==========================================================================}
+
+PROCEDURE AdjustAddressOld(old_ds_base,new_ds_base:dword);
+BEGIN
+END;
+
+{==========================================================================}
+
+VAR OldExitProc:pointer;
+
+PROCEDURE DoneGraphix;
+BEGIN
+  DDDone;
+  DeleteModeList(CurGraphiX.modelist);
+  freemem(graphbuf,graphbufsize);
+  dispose(curpattern);
+  ExitProc:=OldExitProc;
+END;
+
+FUNCTION InitGraphiX(init:longint;memmode:longint):boolean;
+VAR flags:longint;
+BEGIN
+  IF NOT CurGraphiX.detected OR (init<>CurGraphiX.init) THEN GetGraphix(init);
+  InitGraphiX:=CurGraphiX.detected;
+
+  DDInit(GetModuleHandle(nil),SW_SHOW);
+  DDScanModes(CurGraphiX.modelist);
+
+  InitGraphiX:=CurGraphiX.detected;
+  flags:=memmode;
+  MFBused:=FALSE;
+  MMXavail:=(TestMMX>0);
+
+  waitforretrace:=CurGraphiX.retrace;
+  waitforretracestart:=CurGraphiX.retracestart;
+  waitforretraceend:=CurGraphiX.retraceend;
+
+  OldExitProc:=ExitProc;
+  ExitProc:=@DoneGraphiX;
+  getmem(graphbuf,graphbufsize);
+  new(curpattern);
+END;
+
+FUNCTION SetModeGraphiX(xres,yres,col:longint):boolean;
+VAR mode,scanline,hwainit:word;
+    flags,l:longint;
+    bpp:longint;
+BEGIN
+  SetModeGraphix:=FALSE;
+  flags:=CurGraphiX.memmode+col;
+
+  IF (PrimarySurface<>nil) THEN dispose(PrimarySurface);
+
+  FOR l:=0 TO 4 DO
+    BEGIN
+      curmode:=GetModeFromList(CurGraphiX.modelist,xres,yres,flags AND ((NOT ig_colmask) OR (ig_col8 SHL (4-l))) );
+      IF (curmode<>nil) THEN break;
+    END;
+  IF (curmode<>nil) THEN
+    BEGIN
+      GraphiXActive:=FALSE;
+      MFBused:=FALSE;
+      LFBenabled:=TRUE;
+      HWAenabled:=TRUE;
+      HWAclip:=TRUE;
+
+      mode:=curmode^.mode_nr;
+      scanline:=curmode^.scanline;
+      bytperline:=curmode^.bytperline;
+      hwainit:=curmode^.hwainit;
+      hwascanline:=curmode^.hwascanline;
+
+      gxcurcol:=(curmode^.flags AND ig_colmask);
+
+      gxredpos:=curmode^.rpos;
+      gxredsize:=curmode^.rsiz;
+      gxgreenpos:=curmode^.gpos;
+      gxgreensize:=curmode^.gsiz;
+      gxbluepos:=curmode^.bpos;
+      gxbluesize:=curmode^.bsiz;
+      bpp:=curmode^.mode_nr;
+      gxcurcol:=(curmode^.flags AND ig_colmask);
+      gxcurflags:=curmode^.flags;
+
+      DDInitMode(xres,yres,bpp);
+      DDGetPrimarySurfaceDesc(bytperline,gxredpos,gxredsize,gxgreenpos,gxgreensize,gxbluepos,gxbluesize);
+
+      bytperpix:=curmode^.bytperpix;
+      SetProcs(gxcurcol,LFBenabled,MMXavail,HWAenabled);
+      SetCopyProcs;
+      IF HWAenabled THEN CurGraphiX.sethwaprocs(gxcurcol);
+      IF (col=ig_col8) THEN CreateRGBPalette;
+
+      maxX:=curmode^.xres-1;
+      maxY:=curmode^.yres-1;
+
+      drawoffset:=0;
+      drawbufsize:=bytperline*(maxY+1);
+      drawbufsizepix:=longint(maxX+1)*(maxY+1);
+      drawbufsizey:=(maxY+1);
+      scrnsize:=drawbufsize;
+
+      videomemsize:=(CurGraphiX.memory SHL 10);
+      CurGraphiX.numpages:=videomemsize DIV (bytperline*curmode^.yres);
+   {   offscreenmemoffs:=CurGraphiX.numpages*drawbufsize;
+      offscreenmemsize:=videomemsize-offscreenmemoffs;
+      patternmemsize:=8*bytperline;
+      patternmemoffs:=videomemsize-patternmemsize;
+      cursormemsize:=4096;
+      cursormemoffs:=patternmemoffs-cursormemsize;
+      imagememsize:=cursormemoffs-offscreenmemoffs;
+      imagememoffs:=offscreenmemoffs; }
+
+      set_gxcurres(curmode^.xres,curmode^.yres);
+      set_gxcurcol(curmode^.flags);
+
+      CreatePrimarySurface;
+      ExecuteGXUnitInit;
+
+      curbank:=$FFFF;
+      maxgraphwin;
+      SetModeGraphiX:=TRUE;
+      GraphiXActive:=TRUE;
+
+{      PrintString(100,100,CurGraphiX.name);
+      PrintString(100,120,CurGraphiX.vendorname); }
+{MessageBox(GXhwnd,'Mode Switch F','Debug',MB_OK);}
+      DDHandleMessages;
+      DDLock;
+      DDUnLock;
+{MessageBox(GXhwnd,'Mode Switch G','Debug',MB_OK);}
+    END;
+END;
+

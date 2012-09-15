@@ -1,0 +1,1247 @@
+{
+    This file is a part of the graphics library GraphiX
+    Copyright (C) 2001 Michael Knapp
+
+    This library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+    License as published by the Free Software Foundation; either
+    version 2.1 of the License, or (at your option) any later version.
+
+    This library is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    Lesser General Public License for more details.
+
+    You should have received a copy of the GNU Lesser General Public
+    License along with this library; if not, write to the Free Software
+    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+}
+
+{============================================================================}
+
+PROCEDURE AdjustAddressOld(old_ds_base,new_ds_base:dword);forward;
+
+{============================================================================}
+
+PROCEDURE getLFBnMMIO_pci;
+VAR size0,size1:longint;
+BEGIN
+  CurGraphiX.LFBsize:=0;
+  CurGraphiX.LFBaddr:=0;
+  CurGraphiX.MMIOsize:=0;
+  CurGraphiX.MMIOaddr:=0;
+  size0:=((NOT TestPCI32(pciaddr+$10,$FFFFFFFF)) AND $FFFFFFF0)+$10;
+  size1:=((NOT TestPCI32(pciaddr+$14,$FFFFFFFF)) AND $FFFFFFF0)+$10;
+  CASE PCIdevice.vendor OF
+  $1002: {ATI}
+    BEGIN
+      CurGraphiX.LFBaddr:=PCIdevice.base0 AND $FF800000;
+      CurGraphiX.LFBsize:=size0;
+    END;
+  $100C: {Tseng}
+    BEGIN
+      CurGraphiX.LFBaddr:=PCIdevice.base0 AND $FF000000;
+      CurGraphiX.LFBsize:=size0;
+      CurGraphiX.MMIOaddr:=$000B8000;
+      CurGraphiX.MMIOsize:=$00008000;
+    END;
+  $1013: {Cirrus}
+    BEGIN
+      CurGraphiX.LFBaddr:=PCIdevice.base0 AND $FF000000;
+      CurGraphiX.LFBsize:=size0;
+    END;
+  $1023: {Trident}
+    BEGIN
+      CurGraphiX.LFBaddr:=PCIdevice.base0 AND $FFC00000;
+      CurGraphiX.LFBsize:=size0;
+      CurGraphiX.MMIOaddr:=PCIdevice.base1 AND $FFFF0000;
+      CurGraphiX.MMIOsize:=size1;
+      CurGraphiX.MMIOaddr:=$000BFF00;
+      CurGraphiX.MMIOsize:=$00000100;
+    END;
+{  $102B:} {Matrox}
+{    CASE PCIdevice.device OF }
+   { $0519:} {Matrox Millenium I}
+{      BEGIN
+        CurGraphiX.LFBaddr:=PCIdevice.base1 AND $FF800000;
+        CurGraphiX.LFBsize:=size1;
+        CurGraphiX.MMIOaddr:=PCIdevice.base0 AND $FFFFC000;
+        CurGraphiX.MMIOsize:=size0;
+      END; }
+ {   $051A,} {Matrox Mystique}
+  {  $051E:} {Matrox Mystique AGP}
+   {   BEGIN
+        CurGraphiX.LFBaddr:=PCIdevice.base0 AND $FF800000;
+        CurGraphiX.LFBsize:=size0;
+        CurGraphiX.MMIOaddr:=PCIdevice.base1 AND $FFFFC000;
+        CurGraphiX.MMIOsize:=size1;
+      END; }
+ {   $051B,} {Matrox Millenium II PCI}
+  {  $051F,} {Matrox Millenium II AGP}
+  {  $0520,} {Matrox G200 PCI}
+  {  $0521:} {Matrox G200 AGP}
+   {   BEGIN
+        CurGraphiX.LFBaddr:=PCIdevice.base0 AND $FF000000;
+        CurGraphiX.LFBsize:=size0;
+        CurGraphiX.MMIOaddr:=PCIdevice.base1 AND $FFFFC000;
+        CurGraphiX.MMIOsize:=size1;
+      END; }
+ {   $0518:;} {Matrox Atlas 2085PX (MGA-2)}
+  {  $0D10:;} {Matrox Impression Plus}
+{    END; }
+(*  $102C: {Chips&Tech}
+    BEGIN
+      CurGraphiX.LFBaddr:=PCIdevice.base0 AND $FF000000;
+      CurGraphiX.LFBsize:=size0;
+      CurGraphiX.MMIOaddr:=CurGraphiX.LFBaddr+$00400000;
+      CurGraphiX.MMIOsize:=$00400000;
+    END;
+  $1039: {SiS}
+    BEGIN
+      CurGraphiX.LFBaddr:=PCIdevice.base0 AND $FFC00000;
+      CurGraphiX.LFBsize:=size0;
+      CurGraphiX.MMIOaddr:=PCIdevice.base1 AND $FFFF0000;
+      CurGraphiX.MMIOsize:=size1;
+    END; *)
+{  $121A:} {3Dfx}
+{    BEGIN
+      CurGraphiX.MMIOaddr:=PCIdevice.base0 AND $FE000000;
+      CurGraphiX.MMIOsize:=size0;
+      CurGraphiX.LFBaddr:=PCIdevice.base1 AND $FE000000;
+      CurGraphiX.LFBsize:=size1;
+    END; }
+  $5333: {S3}
+    BEGIN
+      CurGraphiX.LFBaddr:=PCIdevice.base0 AND $FF800000;
+      CurGraphiX.LFBsize:=size0;
+    END;
+  $EDD8: {ARK Logic}
+    CASE PCIdevice.device OF
+      $A091,$A099: {ARK 1000PV, ARK 2000PV}
+        BEGIN
+          CurGraphiX.LFBaddr:=PCIdevice.base0 AND $FFE00000;
+          CurGraphiX.LFBsize:=size0;
+          CurGraphiX.MMIOaddr:=$000B8000;
+          CurGraphiX.MMIOsize:=$00000080;
+        END;
+      $A0A1,$A0A9: {ARK 2000MT, ARK 2000MI}
+        BEGIN
+          CurGraphiX.LFBaddr:=PCIdevice.base0 AND $FF800000;
+          CurGraphiX.LFBsize:=size0;
+          CurGraphiX.MMIOaddr:=$000B8000;
+          CurGraphiX.MMIOsize:=$00000080;
+        END;
+    END;
+  END;
+END;
+
+PROCEDURE getLFB_ark;
+BEGIN
+  CurGraphiX.LFBsize:=$00200000;
+  CurGraphiX.LFBaddr:=$FB800000;
+  CurGraphiX.MMIOaddr:=$000B8000;
+  CurGraphiX.MMIOsize:=$00000080;
+END;
+
+PROCEDURE getLFB_ATI;
+BEGIN
+  CurGraphiX.LFBsize:=$00400000;
+  CurGraphiX.LFBaddr:=$04000000;
+END;
+
+PROCEDURE getLFB_cirrus_5422;
+BEGIN
+  CurGraphiX.LFBsize:=$00100000;
+  CurGraphiX.LFBaddr:=$00F00000;
+END;
+
+PROCEDURE getLFB_cirrus_5426;
+BEGIN
+  CurGraphiX.LFBsize:=$00200000;
+  CurGraphiX.LFBaddr:=$00E00000;
+END;
+
+PROCEDURE getLFBnMMIO_chips;
+BEGIN
+  CurGraphiX.LFBsize:=$00400000;
+  CurGraphiX.LFBaddr:=$04000000;
+  CurGraphiX.MMIOsize:=CurGraphiX.LFBsize+$00400000;
+  CurGraphiX.MMIOaddr:=$04000000;
+END;
+
+PROCEDURE getLFB_s3;
+BEGIN
+  CurGraphiX.LFBsize:=$00800000;
+  CurGraphiX.LFBaddr:=$04000000;
+END;
+
+PROCEDURE getLFB_sis;
+BEGIN
+  CurGraphiX.LFBsize:=$00400000;
+  CurGraphiX.LFBaddr:=$04000000;
+END;
+
+PROCEDURE getLFBnMMIO_trident;
+BEGIN
+  CurGraphiX.LFBsize:=$00200000;
+  CurGraphiX.LFBaddr:=$03C00000;
+  CurGraphiX.MMIOsize:=$00000100;
+  CurGraphiX.MMIOaddr:=$000BFF00;
+END;
+
+PROCEDURE getLFB_tseng4000;
+BEGIN
+  CurGraphiX.LFBsize:=$00100000;
+  CurGraphiX.LFBaddr:=$00F00000;
+END;
+
+PROCEDURE getLFB_tseng4000w32;
+BEGIN
+  CurGraphiX.LFBsize:=$00400000;
+  CurGraphiX.LFBaddr:=$00C00000;
+END;
+
+PROCEDURE getLFB_tseng6000;
+BEGIN
+  CurGraphiX.LFBsize:=$00400000;
+  CurGraphiX.LFBaddr:=$3FC00000;
+END;
+
+PROCEDURE getLFB_vesa20;
+VAR VBEModeInfo:TVBEModeInfo;
+BEGIN
+  Get_VBE_Mode_Info(VBEModeInfo,curmode^.mode_nr);
+  CurGraphiX.LFBsize:=dword(CurGraphiX.memory)*1024;
+  CurGraphiX.LFBaddr:=dword(VBEModeInfo.lfbaddr);
+END;
+
+PROCEDURE GetGraphix(init:longint);
+VAR i,id1,id2,memory:word;
+    id:longint;
+    chipid:dword;
+    name:string;
+    detected:boolean;
+    pciinit:longint;
+    pcitype:byte;
+    bus_dev:word;
+    VBEInfo:TVBEInfo;
+    SupVBEInfo:TSupVBEInfo;
+{$IFDEF GXMODES}
+    modeinfolist:Pmodeinfoentry;
+    modeinfo:Tmodeinfoentry;
+{$ENDIF}
+BEGIN
+  detected:=FALSE;
+  name:='not detected';
+  memory:=0;
+  pciinit:=ig_detect;
+  PCIdevice.Vendor:=$FFFF;
+  PCIdevice.Device:=$FFFF;
+
+  CurGraphiX.detected:=FALSE;
+  CurGraphiX.pcidev:=FALSE;
+  CurGraphiX.vbeinit:=FALSE;
+  CurGraphiX.vgacomp:=TRUE;
+  CurGraphiX.oldinit:=FALSE;
+  CurGraphiX.checkmem:=FALSE;
+  CurGraphiX.name:='';
+  CurGraphiX.vendorname:='';
+  CurGraphiX.memory:=0;
+  CurGraphiX.init:=0;
+  CurGraphiX.memmode:=0;
+  CurGraphiX.flags:=0; {gx_xxx - Konstanten}
+  CurGraphiX.numpages:=0;
+  CurGraphiX.bankshift:=0;
+  CurGraphiX.LFBaddr:=0;
+  CurGraphiX.LFBsize:=0;
+  CurGraphiX.MMIOaddr:=0;
+  CurGraphiX.MMIOsize:=0;
+  CurGraphiX.retrace:=retrace_vga;
+  CurGraphiX.retracestart:=retracestart_vga;
+  CurGraphiX.retraceend:=retraceend_vga;
+  CurGraphiX.setcolormode:=@setcolormode_nop;
+  CurGraphiX.enableregs:=@enableregs_nop;
+  CurGraphiX.disableregs:=@disableregs_nop;
+  CurGraphiX.enableLFB:=@enableLFB_nop;
+  CurGraphiX.disableLFB:=@disableLFB_nop;
+  CurGraphiX.enableMMIO:=@enableMMIO_nop;
+  CurGraphiX.disableMMIO:=@disableMMIO_nop;
+  CurGraphiX.getLFBnMMIO:=nil;
+  CurGraphiX.sethwaprocs:=@sethwaprocs_nop;
+  CurGraphiX.ModeList:=nil;
+
+{$IFNDEF VBEONLY}
+  IF (init<>ig_vesa) AND (init<>ig_vga) THEN
+    BEGIN
+{$IFDEF GXINFO}
+      writeln('*** Checking for PCI/AGP ...');
+{$ENDIF}
+      pcitype:=byte(TestPCI);
+      IF (pcitype>0) THEN
+        BEGIN
+          CASE pcitype OF
+            1:bus_dev:=511;
+            2:bus_dev:=15;
+          END;
+{$IFDEF GXINFO}
+          writeln('  type ',pcitype,' found');
+          writeln('*** Scanning PCI/AGP bus ...');
+{$ENDIF}
+          FOR i:=0 TO bus_dev DO
+            BEGIN
+              pciinit:=ig_detect;
+              pciaddr:=GetPCIdevice((i SHR 5) AND $0F,(i AND $1F),PCIdevice);
+              IF (pciaddr<>-1) THEN
+                BEGIN
+{$IFDEF GXINFO}
+                  writeln('  bus ',i SHR 5,'   dev ',i AND $1F,
+                          '   vend-id ',hexword(PCIdevice.vendor),
+                          '   dev-id ',hexword(PCIdevice.device),
+                          '   rev ',hexword(PCIdevice.revision),
+                          '   class ',hexword(PCIdevice.deviceclass));
+{$ENDIF}
+                  IF (PCIdevice.deviceclass=$0300) THEN
+                    CASE PCIdevice.vendor OF
+                      $1002:pciinit:=ig_ati;
+                      $100C:pciinit:=ig_tseng;
+                      $1013:pciinit:=ig_cirrus;
+                      $1023:pciinit:=ig_trident;
+                      $102B:pciinit:=ig_matrox;
+                  (*    $102C:pciinit:=ig_chips;
+                      $1039:pciinit:=ig_sis;     *)
+                      $121A:pciinit:=ig_3dfx;
+                      $5333:pciinit:=ig_s3;
+                      $EDD8:pciinit:=ig_ark;
+                    END;
+                  END;
+              IF (pciinit<>ig_detect) THEN
+                BEGIN
+{$IFDEF GXINFO}
+                  writeln('*** By GraphiX supported graphics-card found');
+                  writeln('  bus ',i SHR 5,'   dev ',i AND $1F,
+                          '   vend-id ',hexword(PCIdevice.vendor),
+                          '   dev-id ',hexword(PCIdevice.device),
+                          '   rev ',hexword(PCIdevice.revision));
+{$ENDIF}
+                  init:=pciinit;
+                  CurGraphiX.PCIdev:=TRUE;
+                  name:=GetPCIname(PCIdevice.vendor,PCIdevice.device,PCIdevice.revision);
+                  chipid:=PCIdevice.device;
+                  CurGraphiX.getLFBnMMIO:=@getLFBnMMIO_pci;
+                  break;
+                END
+            END;
+        END
+      ELSE
+        BEGIN
+          IF NOT detected THEN IF (detectchip_ark(chipid,name)<>0) THEN BEGIN init:=ig_ark;detected:=TRUE; END;
+          IF NOT detected THEN IF (detectchip_ati(chipid,name)<>0) THEN BEGIN init:=ig_ati;detected:=TRUE; END;
+          IF NOT detected THEN IF (detectchip_cirrus(chipid,name)<>0) THEN BEGIN init:=ig_cirrus;detected:=TRUE; END;
+          IF NOT detected THEN IF (detectchip_trident(chipid,name)<>0) THEN BEGIN init:=ig_trident;detected:=TRUE; END;
+          IF NOT detected THEN IF (detectchip_s3(chipid,name)<>0) THEN BEGIN init:=ig_s3;detected:=TRUE; END;
+        END;
+    END;
+
+{=== 3Dfx ===================================================================}
+
+  IF (init=ig_3dfx) THEN
+    BEGIN
+      detected:=TRUE;
+      memory:=detectmem_voodoo3;
+      CurGraphiX.sethwaprocs:=@sethwaprocs_voodoo3;
+      CurGraphiX.setrgbcolor:=@setrgbcolor_vga;
+      CurGraphiX.adjustaddresses:=@adjustaddresses_voodoo;
+      CurGraphiX.enableregs:=@enableregs_voodoo3;
+      CurGraphiX.disableregs:=@disableregs_voodoo3;
+      CurGraphiX.enableHWA:=@enableHWA_voodoo3;
+      CurGraphiX.disableHWA:=@disableHWA_voodoo3;
+      CurGraphiX.flags:=ig_bank OR ig_lfb OR gx_MMIO OR ig_hwaclip;
+      setreslist_voodoo3(CurGraphiX.modelist);
+      CurGraphiX.vbeinit:=TRUE;
+    END;
+
+{=== ARK ====================================================================}
+
+  IF (init=ig_ark) THEN
+    BEGIN
+      CurGraphiX.oldinit:=TRUE;
+      IF CurGraphiX.PCIdev THEN
+        BEGIN
+          CurGraphiX.enableLFB:=@enableLFB_ark_pci;
+        END
+      ELSE
+        BEGIN
+          CurGraphiX.enableLFB:=@enableLFB_ark;
+          CurGraphiX.getLFBnMMIO:=@getLFB_ark;
+        END;
+      detected:=TRUE;
+      memory:=detectmem_ark;
+      CurGraphiX.sethwaprocs:=@sethwaprocs_ark;
+      CurGraphiX.adjustaddresses:=@adjustaddressold;
+      CurGraphiX.initmode:=@initmode_vga;
+      CurGraphiX.enableregs:=@enableregs_ark;
+      CurGraphiX.disableregs:=@disableregs_ark;
+      CurGraphiX.setcolormode:=@setcolormode_ark;
+      CurGraphiX.scanline:=@scanline_ark;
+      CurGraphiX.setrgbcolor:=@setrgbcolor_vga;
+      CurGraphiX.displaystart:=@displaystart_ark;
+      CurGraphiX.bankswitch:=@bankswitch_ark;
+      CurGraphiX.disableLFB:=@disableLFB_ark;
+      CurGraphiX.enableHWA:=@enableHWA_ark;
+      CurGraphiX.disableHWA:=@disableHWA_ark;
+      CurGraphiX.flags:=ig_bank OR ig_lfb OR gx_mmio OR ig_hwaclip;
+      setreslist_ark(CurGraphiX.modelist);
+    END;
+
+{=== ATI ====================================================================}
+
+{  IF (init=ig_ati) THEN
+    BEGIN
+      detected:=TRUE;
+      CurGraphiX.oldinit:=TRUE;
+      IF CurGraphiX.PCIdev THEN
+        BEGIN
+          IF (chipid=$4158) THEN init:=ig_ati_mach32 ELSE init:=ig_ati_mach64;
+        END
+      ELSE
+        BEGIN
+          CurGraphiX.getLFBnMMIO:=@getLFB_ATI;
+          CASE (chipid SHR 24) OF
+          $08:init:=ig_ati_mach8;
+          $32:init:=ig_ati_mach32;
+          $64:init:=ig_ati_mach64;
+          END;
+        END;
+      IF (init AND ig_chiptype=ig_ati) THEN
+        BEGIN
+          memory:=detectmem_ati(chipid);
+          CurGraphiX.setrgbcolor:=@setrgbcolor_ati;
+          CurGraphiX.scanline:=@scanline_ati;
+          CurGraphiX.displaystart:=@displaystart_ati;
+          CurGraphiX.flags:=ig_bank OR ig_lfb;
+          CASE init OF
+            ig_ati_mach8:
+              BEGIN
+                CurGraphiX.enableregs:=@enableregs_ati_mach8;
+                CurGraphiX.disableregs:=@disableregs_ati_mach8;
+                CurGraphiX.adjustaddresses:=@adjustaddressold;
+                CurGraphiX.bankswitch:=@bankswitch_ati_mach8;
+                CurGraphiX.enableLFB:=@enableLFB_ati_mach8;
+                CurGraphiX.disableLFB:=@disableLFB_ati_mach8;
+              END;
+            ig_ati_mach32:
+              BEGIN
+                CurGraphiX.enableregs:=@enableregs_ati_mach32;
+                CurGraphiX.disableregs:=@disableregs_ati_mach32;
+                CurGraphiX.adjustaddresses:=@adjustaddressold;
+                CurGraphiX.bankswitch:=@bankswitch_ati_mach32;
+                CurGraphiX.enableLFB:=@enableLFB_ati_mach32;
+                CurGraphiX.disableLFB:=@disableLFB_ati_mach32;
+              END;
+            ig_ati_mach64:
+              BEGIN
+                CurGraphiX.enableregs:=@enableregs_ati_mach64;
+                CurGraphiX.disableregs:=@disableregs_ati_mach64;
+                CurGraphiX.adjustaddresses:=@adjustaddresses_ati;
+                CurGraphiX.initmode:=@initmode_ati_mach64;
+                CurGraphiX.bankswitch:=@bankswitch_ati_mach64;
+                CurGraphiX.enableLFB:=@enableLFB_ati_mach64;
+                CurGraphiX.disableLFB:=@disableLFB_ati_mach64;
+                setreslist_ati_mach64(CurGraphiX.modelist);
+              END;
+          END;
+        END;
+    END; }
+
+{=== Cirrus =================================================================}
+
+  IF (init=ig_cirrus) THEN
+    BEGIN
+      CurGraphiX.oldinit:=TRUE;
+      IF CurGraphiX.PCIdev THEN
+        BEGIN
+          CurGraphiX.enableLFB:=@enableLFB_cirrus_PCI;
+        END
+      ELSE
+        BEGIN
+          CASE chipid OF
+            $8C,$94:
+              BEGIN
+                CurGraphiX.getLFBnMMIO:=@getLFB_cirrus_5422;
+                CurGraphiX.enableLFB:=@enableLFB_cirrus_542x;
+                CurGraphiX.disableLFB:=@disableLFB_cirrus;
+              END;
+            $90,$98,$9C:
+              BEGIN
+                CurGraphiX.getLFBnMMIO:=@getLFB_cirrus_5426;
+                CurGraphiX.enableLFB:=@enableLFB_cirrus_542x;
+                CurGraphiX.disableLFB:=@disableLFB_cirrus;
+              END;
+          END;
+        END;
+      detected:=TRUE;
+      CASE chipid OF
+        $8A..$8B:CurGraphiX.flags:=ig_bank;
+        $8C..$FF:CurGraphiX.flags:=ig_bank+ig_lfb;
+      END;
+      memory:=detectmem_cirrus;
+      CurGraphiX.adjustaddresses:=@adjustaddressold;
+      CurGraphiX.initmode:=@initmode_vga;
+      CurGraphiX.setcolormode:=@setcolormode_cirrus;
+      CurGraphiX.setrgbcolor:=@setrgbcolor_vga;
+      CurGraphiX.enableregs:=@enableregs_cirrus;
+      CurGraphiX.disableregs:=@disableregs_cirrus;
+      CurGraphiX.bankswitch:=@bankswitch_cirrus;
+      CurGraphiX.scanline:=@scanline_cirrus;
+      CASE chipid OF
+        $80..$9F:CurGraphiX.displaystart:=@displaystart_cirrus_542x;
+        $A0..$BF:CurGraphiX.displaystart:=@displaystart_cirrus_543x;
+      END;
+      CASE chipid OF
+        $8A,$8B,$8C,$94:CurGraphiX.bankshift:=4;
+        $90,$98..$E8:CurGraphiX.bankshift:=2;
+      END;
+      setreslist_cirrus(memory,chipid,CurGraphiX.modelist);
+    END;
+
+{=== Matrox =================================================================}
+
+  IF (init=ig_matrox) THEN
+    BEGIN
+      detected:=TRUE;
+      memory:=detectmem_matrox(chipid);
+      CurGraphiX.sethwaprocs:=@sethwaprocs_matrox;
+      CurGraphiX.adjustaddresses:=@adjustaddresses_matrox;
+      CurGraphiX.bankswitch:=@bankswitch_matrox;
+      CurGraphiX.initmode:=@initmode_vga;
+      CurGraphiX.enableregs:=@enableregs_matrox;
+      CurGraphiX.disableregs:=@disableregs_matrox;
+      CurGraphiX.setrgbcolor:=@setrgbcolor_vga;
+      CurGraphiX.scanline:=@scanline_matrox;
+      CurGraphiX.displaystart:=@displaystart_matrox;
+      CurGraphiX.enableHWA:=@enableHWA_matrox;
+      CurGraphiX.disableHWA:=@disableHWA_matrox;
+      CurGraphiX.flags:=ig_bank OR ig_lfb OR gx_MMIO OR ig_hwaclip;
+      setreslist_matrox(CurGraphiX.modelist);
+      CurGraphiX.vbeinit:=TRUE;
+    END;
+
+{=== S3 =====================================================================}
+
+  IF (init=ig_s3) THEN
+    BEGIN
+      IF CurGraphiX.PCIdev THEN
+        BEGIN
+{          CurGraphiX.oldinit:=FALSE; }
+          CurGraphiX.adjustaddresses:=@adjustaddresses_s3;
+          CurGraphiX.enableLFB:=@enableLFB_s3_pci;
+          CurGraphiX.disableLFB:=@disableLFB_s3_pci;
+          CASE PCIdevice.device OF
+            $8880..$88F0:init:=ig_s3vision;
+            $8810..$8815,$8901..$890F:init:=ig_s3trio;
+            $5631,$883D,$8A01..$8C01:init:=ig_s3virge;
+          END;
+        END
+      ELSE
+        BEGIN
+          CurGraphiX.oldinit:=TRUE;
+          CurGraphiX.adjustaddresses:=@adjustaddressold;
+          CurGraphiX.enableLFB:=@enableLFB_s3;
+          CurGraphiX.disableLFB:=@disableLFB_s3;
+          CurGraphiX.getLFBnMMIO:=@getLFB_s3;
+          CASE chipid OF
+            $0000..$BFFF:init:=ig_s3;
+            $C000..$DFFF:init:=ig_s3vision;
+            $E000..$FFFF:
+              CASE (chipid AND $00F0) OF
+                $0010:init:=ig_s3trio;
+                $0090:init:=ig_s3vision;
+                $00F0:init:=ig_s3vision;
+                ELSE init:=ig_s3virge;
+              END;
+          END;
+        END;
+      detected:=TRUE;
+      memory:=detectmem_s3;
+      CurGraphiX.flags:=ig_bank;
+      CurGraphiX.initmode:=@initmode_vga;
+      CurGraphiX.setrgbcolor:=@setrgbcolor_vga;
+      CurGraphiX.scanline:=@scanline_s3;
+      CurGraphiX.displaystart:=@displaystart_s3;
+      CASE init OF
+        ig_s3:
+          BEGIN
+            CurGraphiX.oldinit:=TRUE;
+            CurGraphiX.enableregs:=@enableregs_s3;
+            CurGraphiX.disableregs:=@disableregs_s3;
+            CurGraphiX.bankswitch:=@bankswitch_s3a;
+            setreslist_s3vision(memory,chipid,CurGraphiX.modelist);
+          END;
+        ig_s3vision:
+          BEGIN
+            CurGraphiX.oldinit:=TRUE;
+            CurGraphiX.flags:=ig_bank OR ig_lfb OR ig_hwaclip;
+            CurGraphiX.sethwaprocs:=@sethwaprocs_s3vision;
+            CurGraphiX.enableregs:=@enableregs_s3;
+            CurGraphiX.disableregs:=@disableregs_s3;
+            CurGraphiX.bankswitch:=@bankswitch_s3b;
+            CurGraphiX.enableHWA:=@enableHWA_s3vision;
+            CurGraphiX.disableHWA:=@disableHWA_s3vision;
+            setreslist_s3vision(memory,chipid,CurGraphiX.modelist);
+          END;
+        ig_s3trio:
+          BEGIN
+            CurGraphiX.oldinit:=TRUE;
+            CurGraphiX.flags:=ig_bank OR ig_lfb OR ig_hwaclip;
+            CurGraphiX.sethwaprocs:=@sethwaprocs_s3vision;
+            CurGraphiX.enableregs:=@enableregs_s3;
+            CurGraphiX.disableregs:=@disableregs_s3;
+            CurGraphiX.bankswitch:=@bankswitch_s3b;
+            CurGraphiX.enableHWA:=@enableHWA_s3vision;
+            CurGraphiX.disableHWA:=@disableHWA_s3vision;
+            setreslist_s3trio(memory,chipid,CurGraphiX.modelist);
+          {  CurGraphiX.vbeinit:=TRUE; }
+          END;
+        ig_s3virge:
+          BEGIN
+            CurGraphiX.flags:=ig_bank OR ig_lfb OR gx_mmio{ OR ig_hwaclip};
+            CurGraphiX.sethwaprocs:=@sethwaprocs_s3virge;
+            CurGraphiX.enableregs:=@enableregs_s3virge;
+            CurGraphiX.disableregs:=@disableregs_s3virge;
+            CurGraphiX.setcolormode:=@setcolormode_s3virge;
+            CurGraphiX.bankswitch:=@bankswitch_s3b;
+            CurGraphiX.enableMMIO:=@enableMMIO_s3virge;
+            CurGraphiX.disableMMIO:=@disableMMIO_s3virge;
+            CurGraphiX.enableHWA:=@enableHWA_s3virge;
+            CurGraphiX.disableHWA:=@disableHWA_s3virge;
+            setreslist_s3virge(memory,chipid,CurGraphiX.modelist);
+          END;
+      END;
+    END;
+
+{=== Trident ================================================================}
+
+  IF (init=ig_trident) THEN
+    BEGIN
+      CurGraphiX.oldinit:=TRUE;
+      IF CurGraphiX.PCIdev THEN
+        BEGIN
+          CurGraphiX.flags:=ig_bank OR ig_lfb OR gx_MMIO;
+          IF (PCIdevice.device>=$9600) THEN CurGraphiX.flags:=CurGraphiX.flags OR ig_hwaclip;
+          CurGraphiX.bankswitch:=@bankswitch_trident_b;
+          CurGraphiX.enableLFB:=@enableLFB_trident_pci;
+        END
+      ELSE
+        BEGIN
+          CASE ((chipid SHR 8) AND $FF) OF
+            $02..$43:CurGraphiX.bankswitch:=@bankswitch_trident_a;
+            $53..$F3:CurGraphiX.bankswitch:=@bankswitch_trident_b;
+            ELSE CurGraphiX.Bankswitch:=@bankswitch_trident_a;
+          END;
+          CASE ((chipid SHR 8) AND $FF) OF
+            $01     :CurGraphiX.flags:=0;
+            $02..$63:CurGraphiX.flags:=ig_bank;
+            $73..$F3:CurGraphiX.flags:=ig_bank OR ig_lfb OR gx_MMIO OR ig_hwa;
+            ELSE CurGraphiX.flags:=ig_bank OR ig_lfb;
+          END;
+          CurGraphiX.enableLFB:=@enableLFB_trident;
+          CurGraphiX.getLFBnMMIO:=@getLFBnMMIO_trident;
+        END;
+      IF ((init AND $00FF)=ig_trident) THEN
+        BEGIN
+          detected:=TRUE;
+          memory:=detectmem_trident;
+          CurGraphiX.sethwaprocs:=@sethwaprocs_trident;
+          CurGraphiX.adjustaddresses:=@adjustaddressold;
+          CurGraphiX.initmode:=@initmode_vga;
+      {    CurGraphiX.setcolormode:=@setcolormode_nop; }
+          CurGraphiX.enableregs:=@enableregs_trident;
+          CurGraphiX.disableregs:=@disableregs_trident;
+          CurGraphiX.setrgbcolor:=@setrgbcolor_vga;
+          CurGraphiX.scanline:=@scanline_trident;
+          CurGraphiX.displaystart:=@displaystart_trident;
+          CurGraphiX.disableLFB:=@disableLFB_trident;
+          CurGraphiX.enableMMIO:=@enableMMIO_trident;
+          CurGraphiX.disableMMIO:=@disableMMIO_trident;
+          CurGraphiX.enableHWA:=@enableHWA_trident;
+          CurGraphiX.disableHWA:=@disableHWA_trident;
+          setreslist_trident(memory,chipid,CurGraphiX.modelist);
+        END;
+    END;
+
+{=== Tseng ==================================================================}
+
+  IF (init=ig_detect) OR (init=ig_tseng) THEN
+    BEGIN
+      CurGraphiX.oldinit:=TRUE;
+      IF CurGraphiX.PCIdev THEN
+        BEGIN
+          CurGraphiX.bankswitch:=@bankswitch_Tseng;
+          CurGraphiX.flags:=ig_bank OR ig_lfb;
+          CASE PCIdevice.device OF
+            $3202..$3207:
+              BEGIN
+                CurGraphiX.enableLFB:=@enableLFB_Tseng4000;
+                CurGraphiX.disableLFB:=@disableLFB_Tseng4000;
+                init:=ig_tseng4000w32;
+              END;
+            $3208:
+              BEGIN
+            {    CurGraphiX.flags:=CurGraphiX.flags OR gx_MMIO; }
+                init:=ig_tseng6000;
+              END;
+          END;
+        END
+      ELSE
+        BEGIN
+          ASM
+            CALL detect_tseng
+            MOV id1,AX
+            MOV id2,DX
+          END;
+{$IFDEF GXINFO}
+          writeln('  Tesing for ''Tseng Labs''   ',hexword(id1),' ',hexword(id2));
+{$ENDIF}
+          IF (id1<>0) AND NOT detected THEN
+            BEGIN
+              CASE id1 OF
+                $0300:name:='Tseng ET3000';
+                $0400:name:='Tseng ET4000';
+                $0401:name:='Tseng ET4000W32';
+                $0431:name:='Tseng ET4000W32i';
+                $0421:name:='Tseng ET4000W32p';
+                ELSE name:='Tseng - unknown - ID '+hexword(id1);
+              END;
+              CurGraphiX.flags:={gx_col8 OR gx_col15 OR gx_col16 OR gx_col24 OR} ig_bank OR ig_lfb;
+              CurGraphiX.getLFBnMMIO:=@getLFB_Tseng4000;
+              CurGraphiX.enableLFB:=@enableLFB_Tseng4000;
+              CurGraphiX.disableLFB:=@disableLFB_Tseng4000;
+              CASE id1 OF
+              $0300:init:=ig_detect;
+              $0400:
+                BEGIN
+                  init:=ig_tseng4000;
+                  CurGraphiX.getLFBnMMIO:=@getLFB_Tseng4000;
+                END;
+              $0401:
+                BEGIN
+                  init:=ig_tseng4000w32;
+                  CurGraphiX.getLFBnMMIO:=@getLFB_Tseng4000w32;
+                END;
+              END;
+            END;
+        END;
+      IF (init AND ig_chiptype=ig_tseng) THEN
+        BEGIN
+          detected:=TRUE;
+          CurGraphiX.adjustaddresses:=@adjustaddressold;
+          CurGraphiX.enableregs:=@enableregs_tseng;
+          CurGraphiX.disableregs:=@disableregs_tseng;
+          CurGraphiX.setrgbcolor:=@setrgbcolor_vga;
+          CurGraphiX.scanline:=@scanline_Tseng;
+          CurGraphiX.displaystart:=@displaystart_tseng;
+          CurGraphiX.bankswitch:=@bankswitch_tseng;
+          CASE init OF
+          ig_tseng4000:
+            BEGIN
+              CurGraphiX.initmode:=@initmode_tseng4000;
+              memory:=detectmem_tseng4000;
+              setreslist_tseng4000(CurGraphiX.modelist);
+            END;
+          ig_tseng4000w32:
+            BEGIN
+              CurGraphiX.initmode:=@initmode_tseng4000;
+              memory:=detectmem_tseng4000w32;
+              setreslist_tseng4000(CurGraphiX.modelist);
+            END;
+          ig_tseng6000:
+            BEGIN
+              CurGraphiX.initmode:=@initmode_tseng6000;
+              CurGraphiX.setcolormode:=@setcolormode_tseng6000;
+              CurGraphiX.enableLFB:=@enableLFB_Tseng6000;
+              CurGraphiX.disableLFB:=@disableLFB_Tseng6000;
+              CurGraphiX.enableMMIO:=@enableMMIO_Tseng6000;
+              CurGraphiX.disableMMIO:=@disableMMIO_Tseng6000;
+              memory:=detectmem_tseng6000;
+              setreslist_tseng6000(CurGraphiX.modelist);
+            END;
+          END;
+        END;
+    END;
+
+{$IFDEF GXINFO}
+  writeln('### Inittype ',hexword(init));
+{$ENDIF}
+
+{============================================================================}
+
+  IF (init<>ig_vga) AND (init<>ig_vesa) THEN
+    IF NOT detected THEN
+      BEGIN
+        init:=ig_detect;
+{$IFDEF GXINFO}
+        writeln('!!! NO supported graphics-card found');
+{$ENDIF}
+      END;
+
+{$ENDIF}{VBEONLY}
+
+{$IFDEF GXINFO}
+  writeln('*** Checking for VBE ...');
+{$ENDIF}
+
+{  CurGraphiX.vendorname:='not available'; }
+  CurGraphiX.vendorname:='GraphiX Direct Interface';
+  IF Get_VBE_Info(VBEInfo) THEN
+    BEGIN
+      CurGraphiX.vendorname:=Get_VBE_OEM_string;
+      IF (init=ig_detect) OR (init=ig_vesa) OR CurGraphiX.vbeinit THEN
+        BEGIN
+          CurGraphiX.vbeinit:=TRUE;
+          name:=name+'/VBE';
+          DeleteModeList(CurGraphiX.modelist);
+          Scan_VBE_Modes(CurGraphiX.modelist,CurGraphiX.flags);
+          memory:=VBEInfo.memory SHL 6;
+          CurGraphiX.initmode:=@initmode_vesa;
+        {  CurGraphiX.setcolormode:=@setcolormode_nop; }
+          CASE VBEinfo.Version OF
+            $0102..$01FF:
+              BEGIN
+                CurGraphiX.scanline:=@scanline_vesa12;
+                CurGraphiX.bankswitch:=@bankswitch_vesa;
+                CurGraphiX.setrgbcolor:=@setrgbcolor_vesa;
+                CurGraphiX.displaystart:=@displaystart_vesa12;
+              END;
+            $0200..$FFFF:
+              BEGIN
+                CurGraphiX.scanline:=@scanline_vesa20;
+                CurGraphiX.bankswitch:=@bankswitch_vesa;
+                CurGraphiX.setrgbcolor:=@setrgbcolor_vesa;
+                CurGraphiX.displaystart:=@displaystart_vesa20;
+              END;
+          END;
+        END;
+{$IFDEF GXINFO}
+      writeln('  VBE ',hexbyte(VBEInfo.Version SHR 8),'.',hexbyte(VBEInfo.Version),' found');
+      writeln('  ',CurGraphiX.vendorname);
+{$ENDIF}
+      IF (init=ig_detect) OR (init=ig_vesa) THEN
+        BEGIN
+{$IFDEF GXINFO}
+          writeln('*** Selecting VBE');
+{$ENDIF}
+          CurGraphiX.oldinit:=TRUE;
+          detected:=TRUE;
+          name:='VBE';
+          CASE VBEinfo.Version OF
+            $0102..$01FF:
+              BEGIN
+                init:=ig_vesa12;
+                name:='VBE 1.2';
+                CurGraphiX.flags:=ig_bank;
+                CurGraphiX.adjustaddresses:=@adjustaddressold;
+              END;
+            $0200..$FFFF:
+              BEGIN
+                CASE VBEinfo.Version OF
+                 $0200:init:=ig_vesa20;
+                 $0300:init:=ig_vesa30;
+                END;
+                name:='VBE '+long2str(hi(VBEinfo.version))+'.'+long2str(lo(VBEinfo.version));
+                CurGraphiX.flags:=ig_bank OR ig_lfb;
+                CurGraphiX.getLFBnMMIO:=@getLFB_vesa20;
+                CurGraphiX.adjustaddresses:=@adjustaddressold;
+              END;
+          END;
+          IF (VBEinfo.Version>=$0200) THEN
+            BEGIN
+              Setup_VBEPMod32_interface;
+              IF vbepmod32_used THEN
+                BEGIN
+                  CurGraphiX.bankswitch:=@bankswitch_vbepmod32;
+                  CurGraphiX.displaystart:=@displaystart_vbepmod32;
+                  name:=name+'/PM32';
+                END;
+
+           {   FOR id1:=$0D TO $FF DO
+                IF Get_SupVBE_info(SupVBEInfo,$4F00+id1) THEN
+                  name:=name+'+'+supvbeinfo.signature; }
+        {      IF Get_SupVBE_info(SupVBEInfo,$4F17) THEN
+                BEGIN
+                  name:=name+', VBE/AF 1.0';
+                  CASE SupVBEinfo.version OF
+                    $0100:name:=name+', VBE/AF 1.0';
+                  END;
+                END; }
+            END;
+        END;
+  {    ELSE
+        BEGIN
+          CurGraphiX.vendorname:='GraphiX Direct Interface';
+        END; }
+    END;
+
+  IF (init=ig_detect) OR (init=ig_vga) THEN
+    BEGIN
+{$IFDEF GXINFO}
+      writeln('*** Selecting Standard VGA');
+{$ENDIF}
+      CurGraphiX.oldinit:=TRUE;
+      detected:=TRUE;
+      name:='Standard VGA';
+      memory:=64;
+      init:=ig_vga;
+      CurGraphiX.flags:={gx_col8 OR }ig_bank;
+      CurGraphiX.adjustaddresses:=@adjustaddressold;
+      CurGraphiX.initmode:=@initmode_vga;
+      CurGraphiX.bankswitch:=@bankswitch_nop;
+      CurGraphiX.scanline:=@scanline_vga;
+      CurGraphiX.displaystart:=@displaystart_vga;
+      AddModeToList(CurGraphiX.modelist,$13, 320, 200,1, 320, $28, 0,0, 5,3,2,3,0,2, ig_bank+ig_col8);
+    END;
+
+  CurGraphiX.detected:=detected;
+  CurGraphiX.name:=name;
+  CurGraphiX.memory:=memory;
+  CurGraphiX.init:=init;
+
+{$IFDEF GXINFO}
+  writeln('*** SUMMARY');
+  IF detected THEN
+    BEGIN
+      writeln('  Inittype ...... ',hexword(init));
+      writeln('  Name .......... ',name);
+      writeln('  Vendor-Name ... ',CurGraphiX.vendorname);
+      writeln('  Memory ........ ',memory,'KB');
+    END
+  ELSE
+    BEGIN
+      writeln('!!! NO GRAPHICS DEVICE FOUND');
+    END;
+  writeln('Press key to continue ...');
+  readkey;
+{$ENDIF}
+
+{$IFDEF GXMODES}
+  writeln('*** Supported Modes:');
+  modeinfolist:=CreateModeInfoList;
+  WHILE GetNextModeInfo(modeinfolist,modeinfo) DO
+    BEGIN
+      writeln(modeinfo.name);
+    END;
+  writeln('Press key to continue ...');
+  readkey;
+{$ENDIF}
+
+END;
+
+{==========================================================================}
+
+PROCEDURE InitVGA;
+BEGIN
+  VGAphys:=$000A0000;
+  VGAsize:=$00010000;
+  VGAlinear:=get_linear_addr(VGAphys,VGAsize);
+  lock_linear_region(VGAlinear,VGAsize);
+  VGAbase:=VGAlinear-dword(get_segment_base_address(get_ds));
+END;
+
+PROCEDURE DoneVGA;
+BEGIN
+  unlock_linear_region(VGAlinear,VGAsize);
+  LFBenabled:=FALSE;
+END;
+
+PROCEDURE InitLFB;
+BEGIN
+  LFBlinear:=dword(get_linear_addr(longint(LFBphys),longint(LFBsize)));
+  lock_linear_region(LFBlinear,LFBsize);
+  LFBbase:=LFBlinear-dword(get_segment_base_address(get_ds));
+  LFBoffs:=LFBbase;
+END;
+
+PROCEDURE DoneLFB;
+BEGIN
+  CurGraphiX.disableLFB;
+  unlock_linear_region(LFBlinear,LFBsize);
+  LFBenabled:=FALSE;
+END;
+
+PROCEDURE InitMMIO;
+BEGIN
+  MMIOlinear:=get_linear_addr(MMIOphys,MMIOsize);
+  lock_linear_region(MMIOlinear,MMIOsize);
+  MMIOoffs:=MMIOlinear-dword(get_segment_base_address(get_ds));
+END;
+
+PROCEDURE DoneMMIO;
+BEGIN
+  CurGraphiX.disableMMIO;
+  unlock_linear_region(MMIOlinear,MMIOsize);
+  MMIOenabled:=FALSE;
+END;
+
+PROCEDURE DoneHW;
+BEGIN
+  CurGraphiX.DisableHWA;
+  HWAenabled:=FALSE;
+END;
+
+PROCEDURE AdjustAddressOld(old_ds_base,new_ds_base:dword);
+BEGIN
+  VGAbase:=VGAlinear-dword(get_segment_base_address(get_ds));
+  LFBbase:=LFBlinear-dword(get_segment_base_address(get_ds));
+  MMIOoffs:=MMIOlinear-dword(get_segment_base_address(get_ds));
+END;
+
+PROCEDURE AdjustAllAddresses(old_ds_base,new_ds_base:dword);
+BEGIN
+  IF (LFBoffs=LFBbase) THEN adjustaddress(LFBoffs,old_ds_base,new_ds_base);
+  adjustaddress(VGAbase,old_ds_base,new_ds_base);
+  CurGraphiX.adjustaddresses(old_ds_base,new_ds_base);
+END;
+
+{==========================================================================}
+
+VAR OldExitProc:pointer;
+
+{CONST ExitProcCalled:boolean:=FALSE;}
+
+PROCEDURE DoneGraphix;
+BEGIN
+  ExitProc:=OldExitProc;
+  IF (PrimarySurface<>nil) THEN dispose(PrimarySurface);
+  Cleanup_VBEPMod32_Interface;
+  IF LFBenabled THEN DoneLFB;
+  IF HWAenabled THEN DoneHW;
+  IF MMIOenabled THEN DoneMMIO;
+  DeleteModeList(CurGraphiX.modelist);
+  freemem(graphbuf,graphbufsize);
+  dispose(curpattern);
+  InitText;
+END;
+
+FUNCTION InitGraphiX(init:longint;memmode:longint):boolean;
+VAR flags:longint;
+BEGIN
+  IF NOT CurGraphiX.detected OR (init<>CurGraphiX.init) THEN GetGraphix(init);
+  InitGraphiX:=CurGraphiX.detected;
+
+  flags:=memmode;
+  MMIOenabled:=(CurGraphiX.flags AND gx_mmio=gx_mmio);
+  MFBused:=FALSE;
+  MMXavail:=(TestMMX>0);
+
+{  MMXavail:=FALSE; }
+
+  CurGraphiX.memmode:=flags;
+  curinit:=CurGraphiX.Init;
+  gxcurflags:=flags;
+  bankgran:=CurGraphiX.bankshift;
+
+  CASE curinit OF
+  ig_3dfx:setupdevice_voodoo(pciaddr,pcidevice);
+  ig_ati_mach64:setupdevice_ati(pciaddr,pcidevice);
+  ig_matrox:setupdevice_matrox(pciaddr,pcidevice);
+  ig_s3virge:setupdevice_s3(pciaddr,pcidevice);
+  END;
+  LFBoffs:=LFBbase;
+
+{-----------------------}
+{  IF NOT ((init=ig_matrox) OR (init=ig_3dfx) OR (init=ig_s3virge)) THEN }
+  IF CurGraphiX.oldinit THEN
+  IF MMIOenabled THEN
+    BEGIN
+      CurGraphiX.getLFBnMMIO;
+      MMIOphys:=CurGraphiX.MMIOaddr;
+      MMIOsize:=CurGraphiX.MMIOsize;
+      InitMMIO;
+    END;
+{-----------------------}
+  bankswitch:=CurGraphiX.bankswitch;
+  waitforretrace:=CurGraphiX.retrace;
+  waitforretracestart:=CurGraphiX.retracestart;
+  waitforretraceend:=CurGraphiX.retraceend;
+
+  OldExitProc:=ExitProc;
+  ExitProc:=@DoneGraphiX;
+  getmem(graphbuf,graphbufsize);
+  new(curpattern);
+END;
+
+FUNCTION SetModeGraphiX(xres,yres,col:longint):boolean;
+VAR mode,scanline,hwainit:word;
+    VBEModeInfo:TVBEModeInfo;
+    flags,l:longint;
+BEGIN
+  SetModeGraphix:=FALSE;
+  flags:=CurGraphiX.memmode+col;
+
+  IF (PrimarySurface<>nil) THEN dispose(PrimarySurface);
+
+  FOR l:=0 TO 4 DO
+    BEGIN
+      curmode:=GetModeFromList(CurGraphiX.modelist,xres,yres,flags AND ((NOT ig_colmask) OR (ig_col8 SHL (4-l))) );
+      IF (curmode<>nil) THEN break;
+    END;
+  IF (curmode<>nil) THEN
+    BEGIN
+      IF GraphiXActive THEN IF LFBenabled THEN DoneLFB ELSE DoneVGA;
+      LFBenabled:=(CurGraphiX.flags AND ig_lfb=ig_lfb) AND (CurGraphiX.memmode AND ig_lfb=ig_lfb) AND (curmode^.flags AND ig_lfb=ig_lfb);
+      HWAenabled:=(CurGraphiX.flags AND ig_hwa=ig_hwa) AND (CurGraphiX.memmode AND ig_hwa=ig_hwa) AND (curmode^.flags AND ig_hwa=ig_hwa);
+      HWAclip:=HWAenabled AND (CurGraphiX.flags AND ig_hwaclip=ig_hwaclip);
+      MFBused:=FALSE;
+
+      mode:=curmode^.mode_nr;
+      scanline:=curmode^.scanline;
+      hwainit:=curmode^.hwainit;
+      hwascanline:=curmode^.hwascanline;
+
+      gxredpos:=curmode^.rpos;
+      gxredsize:=curmode^.rsiz;
+      gxgreenpos:=curmode^.gpos;
+      gxgreensize:=curmode^.gsiz;
+      gxbluepos:=curmode^.bpos;
+      gxbluesize:=curmode^.bsiz;
+      gxcurcol:=(curmode^.flags AND ig_colmask);
+      gxcurflags:=curmode^.flags;
+
+     { IF (curinit=ig_vesa12) OR (curinit=ig_vesa20) OR (curinit=ig_vesa30) OR CurGraphiX.vbeinit THEN }
+      IF CurGraphiX.vbeinit THEN
+        BEGIN
+          Get_VBE_Mode_Info(VBEModeInfo,Mode);
+          bankgran:=logdual(64 DIV VBEModeInfo.wingran);
+        END;
+
+{-----------------------}
+    {  IF NOT ((curinit=ig_matrox) OR (curinit=ig_3dfx) OR (curinit=ig_s3virge)) THEN }
+      IF CurGraphiX.oldinit THEN
+      IF LFBenabled THEN
+        BEGIN
+          CurGraphiX.getLFBnMMIO;
+          LFBphys:=CurGraphiX.LFBaddr;
+          LFBsize:=CurGraphiX.LFBsize;
+          IF (cardinal(LFBphys)<=$00100000) THEN
+            BEGIN
+              InitText;
+              writeln('LFB cannot be inizialised');
+              writeln('LFB-address is below the 1MB bondary: ',hexlong(LFBphys));
+              writeln('GraphiX is using bankswitching instead');
+              writeln('Press key to continue');
+              readkey;
+              LFBEnabled:=FALSE;
+              MMXavail:=FALSE;
+            END;
+        END;
+{-----------------------}
+      CurGraphiX.initmode(mode);
+      CurGraphiX.enableregs;
+      IF LFBenabled THEN
+        BEGIN
+          IF CurGraphiX.vbeinit THEN
+            BEGIN
+              CurGraphiX.InitMode(mode OR $4000);
+              CurGraphiX.enableregs;
+            END;
+          CurGraphiX.enableLFB(LFBphys);
+{-----------------------}
+          IF CurGraphiX.oldinit THEN InitLFB;
+{-----------------------}
+        END
+      ELSE
+        BEGIN
+          InitVGA;
+        END;
+      IF MMIOenabled THEN CurGraphiX.enableMMIO(MMIOphys);
+
+  {    pageflip:=@pageflipfrontbuf; }
+
+      bytperpix:=curmode^.bytperpix;
+      SetProcs(gxcurcol,LFBenabled,MMXavail,HWAenabled);
+      SetCopyProcs;
+      IF HWAenabled THEN CurGraphiX.sethwaprocs(gxcurcol);
+      IF (gxcurcol=ig_col8) THEN CreateRGBPalette;
+
+      IF (NOT LFBenabled AND (curinit<>ig_vga)) OR ((curinit=ig_trident) AND HWAenabled) THEN
+        BEGIN
+          scanline:=roundpower2(scanline);
+          hwascanline:=roundpower2(hwascanline);
+        END;
+
+      maxX:=curmode^.xres-1;
+      maxY:=curmode^.yres-1;
+
+      IF LFBenabled OR (curinit=ig_vga) THEN
+        BEGIN
+          IF CurGraphiX.vbeinit THEN
+            BEGIN
+              bytperline:=curmode^.scanline;
+            END
+          ELSE
+            BEGIN
+              bytperline:=curmode^.bytperline;
+              CurGraphiX.scanline(scanline);
+            END;
+        END
+      ELSE
+        BEGIN
+          bytperline:=roundpower2(curmode^.bytperline);
+          CurGraphiX.scanline(scanline);
+        END;
+      IF ((curinit=ig_trident) AND HWAenabled) THEN
+        bytperline:=roundpower2(curmode^.bytperline);
+
+      IF HWAenabled THEN CurGraphiX.enableHWA(gxcurcol,hwainit,bytperline,bytperpix,curmode^.xres);
+
+      CurGraphiX.setcolormode(gxcurcol);
+
+      drawbufsize:=bytperline*dword(maxY+1);
+      drawbufsizepix:=longint(maxX+1)*(maxY+1);
+      drawbufsizey:=(maxY+1);
+      scrnsize:=drawbufsize;
+
+   {   IF NOT CurGraphiX.vbeinit AND CurGraphiX.checkmem THEN
+        BEGIN
+          IF LFBenabled THEN l:=testvmemL(LFBsize-1) ELSE l:=testvmemB(1023*65536);
+          IF (l<>-1) THEN CurGraphiX.memory:=l SHR 10;
+        END; }
+
+      videomemsize:=(CurGraphiX.memory SHL 10);
+      CurGraphiX.numpages:=dword(videomemsize) DIV dword(bytperline*curmode^.yres);
+      offscreenmemoffs:=CurGraphiX.numpages*drawbufsize;
+      offscreenmemsize:=videomemsize-offscreenmemoffs;
+      patternmemsize:=8*bytperline;
+      patternmemoffs:=videomemsize-patternmemsize;
+      cursormemsize:=4096;
+      cursormemoffs:=patternmemoffs-cursormemsize;
+      imagememsize:=cursormemoffs-offscreenmemoffs;
+      imagememoffs:=offscreenmemoffs;
+
+      set_gxcurres(curmode^.xres,curmode^.yres);
+      set_gxcurcol(curmode^.flags);
+
+{DBG('--------------------------------------------------');
+DBG('videomem ..... '+hexlong(0)+' - '+hexlong(offscreenmemoffs));
+DBG('imagemem ..... '+hexlong(imagememoffs)+' - '+hexlong(imagememoffs+imagememsize)+' - '+hexlong(imagememsize));
+DBG('cursormem .... '+hexlong(cursormemoffs)+' - '+hexlong(cursormemoffs+cursormemsize)+' - '+hexlong(cursormemsize));
+DBG('patternmem ... '+hexlong(patternmemoffs)+' - '+hexlong(patternmemoffs+patternmemsize)+' - '+hexlong(patternmemsize));}
+
+
+{      ResetCacheList; }
+      InitVideoMem(CurGraphiX.memory SHL 10,0);
+      CreatePrimarySurface;
+      ExecuteGXUnitInit;
+
+ {     SetVisualPage(0);
+      SetActivePage(0); }
+
+      curbank:=$FFFF;
+      maxgraphwin;
+      SetModeGraphiX:=TRUE;
+      GraphiXActive:=TRUE;
+    END;
+END;
+
+
+
+
